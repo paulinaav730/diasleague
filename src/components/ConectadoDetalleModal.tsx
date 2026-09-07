@@ -16,6 +16,7 @@ import {
   Award,
   AlertCircle,
   FileSpreadsheet,
+  Pencil,
 } from 'lucide-react';
 import { Evento, Reto } from '../types';
 
@@ -44,7 +45,9 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
     eliminarEvento,
     cambiarEstadoEvento,
     crearReto,
+    actualizarReto,
     eliminarReto,
+    actualizarParticipacionReto,
     asignarGanadorReto,
     anularAsistencia,
     registrarAsistencia,

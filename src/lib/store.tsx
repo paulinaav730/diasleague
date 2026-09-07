@@ -123,7 +123,7 @@ interface AppContextType {
 
   // Actions - Eventos
   crearEvento: (evento: Omit<Evento, 'id' | 'createdAt'>) => void;
-  actualizarEvento: (id: string, updates: Partial<Evento>) => void;
+  actualizarEvento: (id: string, updates: Partial<Evento>, retroactivo?: boolean) => void;
   cambiarEstadoEvento: (id: string, nuevoEstado: Evento['estado']) => void;
   eliminarEvento: (id: string) => void;
 
@@ -135,8 +135,9 @@ interface AppContextType {
 
   // Actions - Retos
   crearReto: (reto: Omit<Reto, 'id' | 'createdAt'>) => void;
-  actualizarReto: (id: string, updates: Partial<Reto>) => void;
+  actualizarReto: (id: string, updates: Partial<Reto>, retroactivo?: boolean) => void;
   eliminarReto: (id: string) => void;
+  actualizarParticipacionReto: (id: string, updates: Partial<ParticipacionReto>) => void;
   asignarGanadorReto: (params: {
     retoId: string;
     gtId: string;
@@ -768,9 +769,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 
   const actualizarEvento = useCallback(
-    (id: string, updates: Partial<Evento>) => {
+    (id: string, updates: Partial<Evento>, retroactivo: boolean = false) => {
       setEventos((prev) => prev.map((e) => (e.id === id ? { ...e, ...updates } : e)));
-      addAuditLog('ACTUALIZAR_EVENTO', 'evento', id, `Actualización en evento ${id}`);
+      if (retroactivo && typeof updates.puntosAsistencia === 'number') {
+        const nuevosPuntos = updates.puntosAsistencia;
+        setAsistencias((prev) =>
+          prev.map((a) => (a.eventoId === id && !a.anulado ? { ...a, puntosOtorgados: nuevosPuntos } : a))
+        );
+      }
+      addAuditLog('ACTUALIZAR_EVENTO', 'evento', id, `Actualización en evento ${id}: ${JSON.stringify(updates)}`);
     },
     [addAuditLog]
   );
@@ -864,9 +871,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 
   const actualizarReto = useCallback(
-    (id: string, updates: Partial<Reto>) => {
+    (id: string, updates: Partial<Reto>, retroactivo: boolean = false) => {
       setRetos((prev) => prev.map((r) => (r.id === id ? { ...r, ...updates } : r)));
-      addAuditLog('ACTUALIZAR_RETO', 'reto', id, `Actualización de reto`);
+      if (retroactivo && typeof updates.puntos === 'number') {
+        const nuevosPuntos = updates.puntos;
+        setParticipacionesRetos((prev) =>
+          prev.map((pr) => (pr.retoId === id && !pr.anulado ? { ...pr, puntosOtorgados: nuevosPuntos } : pr))
+        );
+      }
+      addAuditLog('ACTUALIZAR_RETO', 'reto', id, `Actualización de reto ${id}: ${JSON.stringify(updates)}`);
+    },
+    [addAuditLog]
+  );
+
+  const actualizarParticipacionReto = useCallback(
+    (id: string, updates: Partial<ParticipacionReto>) => {
+      setParticipacionesRetos((prev) =>
+        prev.map((pr) => (pr.id === id ? { ...pr, ...updates } : pr))
+      );
+      addAuditLog(
+        'ACTUALIZAR_PARTICIPACION_RETO',
+        'participacion_reto',
+        id,
+        `Se actualizaron datos/puntos de asignación de reto: ${JSON.stringify(updates)}`
+      );
     },
     [addAuditLog]
   );
@@ -1261,6 +1289,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       crearReto,
       actualizarReto,
       eliminarReto,
+      actualizarParticipacionReto,
       asignarGanadorReto,
       actualizarFactor,
       actualizarRangoFactor,
@@ -1315,6 +1344,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       crearReto,
       actualizarReto,
       eliminarReto,
+      actualizarParticipacionReto,
       asignarGanadorReto,
       actualizarFactor,
       actualizarRangoFactor,
