@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import { useApp } from '../lib/store';
 import {
@@ -8,11 +8,9 @@ import {
   Clock,
   Sparkles,
   Trophy,
-  ArrowRight,
-  Search,
   Users,
   Shield,
-  PlusCircle,
+  Search,
 } from 'lucide-react';
 
 interface ParticipantRegisterViewProps {
@@ -27,7 +25,6 @@ export const ParticipantRegisterView: React.FC<ParticipantRegisterViewProps> = (
   initialEventoId,
   initialTurnoId,
   onViewRanking,
-  onViewGt,
 }) => {
   const {
     eventos,
@@ -37,13 +34,13 @@ export const ParticipantRegisterView: React.FC<ParticipantRegisterViewProps> = (
     temporadaActiva,
     registrarAsistencia,
     asistencias,
-    crearPersona,
   } = useApp();
 
   // Find active event and shift
   const defaultEvent =
     eventos.find((e) => e.id === initialEventoId) ||
     eventos.find((e) => e.estado === 'activo' && e.utilizaQr) ||
+    eventos.find((e) => e.estado === 'activo') ||
     eventos[0];
 
   const [selectedEventoId, setSelectedEventoId] = useState<string>(
@@ -65,15 +62,10 @@ export const ParticipantRegisterView: React.FC<ParticipantRegisterViewProps> = (
   const activeTurno =
     availableTurnos.find((t) => t.id === selectedTurnoId) || defaultTurno;
 
-  // Person identification state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPersonaId, setSelectedPersonaId] = useState<string>('');
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-
-  // New member creation state if not in list
-  const [isAddingNew, setIsAddingNew] = useState(false);
-  const [newNombre, setNewNombre] = useState('');
-  const [newGtId, setNewGtId] = useState(gts[0]?.id || '');
+  // Simple Name + GT Form State
+  const [nombre, setNombre] = useState('');
+  const [selectedGtId, setSelectedGtId] = useState<string>(gts[0]?.id || '');
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Result and feedback states
   const [submitted, setSubmitted] = useState(false);
@@ -82,29 +74,32 @@ export const ParticipantRegisterView: React.FC<ParticipantRegisterViewProps> = (
     message: string;
     puntos?: number;
     gtNombre?: string;
-    gtId?: string;
+    personaNombre?: string;
   } | null>(null);
 
-  const selectedPersona = personas.find((p) => p.id === selectedPersonaId);
-  const selectedGt = gts.find((g) => g.id === selectedPersona?.gtId);
-
-  // Filtered personas
-  const filteredPersonas = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return personas.filter((p) => p.activo).slice(0, 10);
-    }
+  // Autocomplete matching names from database for ease of typing
+  const matchingPersonas = useMemo(() => {
+    if (!nombre.trim() || nombre.trim().length < 2) return [];
+    const q = nombre.toLowerCase().trim();
     return personas
-      .filter((p) => p.activo && p.nombreCompleto.toLowerCase().includes(searchQuery.toLowerCase()))
-      .slice(0, 15);
-  }, [personas, searchQuery]);
+      .filter((p) => p.activo && p.nombreCompleto.toLowerCase().includes(q))
+      .slice(0, 5);
+  }, [personas, nombre]);
 
   // DUPLICATE PARTICIPATION CHECK IN REAL-TIME
   const duplicateStatus = useMemo(() => {
-    if (!selectedPersonaId || !activeEvento || !temporadaActiva) return null;
+    if (!nombre.trim() || !selectedGtId || !activeEvento || !temporadaActiva) return null;
 
-    const existing = asistencias.find((a) => {
+    const cleanName = nombre.trim().toLowerCase();
+    const existingPersona = personas.find(
+      (p) => p.gtId === selectedGtId && p.nombreCompleto.trim().toLowerCase() === cleanName
+    );
+
+    if (!existingPersona) return null;
+
+    const existingAsist = asistencias.find((a) => {
       if (a.anulado) return false;
-      if (a.personaId !== selectedPersonaId) return false;
+      if (a.personaId !== existingPersona.id) return false;
       if (a.eventoId !== activeEvento.id) return false;
       if (a.temporadaId !== temporadaActiva.id) return false;
 
@@ -114,58 +109,46 @@ export const ParticipantRegisterView: React.FC<ParticipantRegisterViewProps> = (
       return true;
     });
 
-    return existing;
-  }, [selectedPersonaId, activeEvento, activeTurno, temporadaActiva, asistencias]);
+    return existingAsist;
+  }, [nombre, selectedGtId, activeEvento, activeTurno, temporadaActiva, personas, asistencias]);
 
-  const handleSelectPersona = (id: string, nombre: string) => {
-    setSelectedPersonaId(id);
-    setSearchQuery(nombre);
-    setIsDropdownOpen(false);
-    setSubmitted(false);
-    setResultData(null);
-  };
-
-  const handleCreateAndSelect = () => {
-    if (!newNombre.trim()) return;
-    const newId = 'per-' + Date.now();
-    crearPersona({
-      nombreCompleto: newNombre.trim(),
-      gtId: newGtId,
-      activo: true,
-    });
-    setSelectedPersonaId(newId);
-    setSearchQuery(newNombre.trim());
-    setIsAddingNew(false);
+  const handleSelectSuggestion = (p: typeof personas[0]) => {
+    setNombre(p.nombreCompleto);
+    setSelectedGtId(p.gtId);
+    setShowSuggestions(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedPersonaId) {
-      alert('Por favor selecciona o ingresa tu nombre.');
+    if (!nombre.trim()) {
+      alert('Por favor ingresa tu nombre completo.');
+      return;
+    }
+
+    if (!selectedGtId) {
+      alert('Por favor selecciona tu Grupo de Trabajo (GT).');
       return;
     }
 
     if (!activeEvento) {
-      alert('Evento no seleccionado.');
+      alert('No hay un evento seleccionado.');
       return;
     }
 
     const res = registrarAsistencia({
-      personaId: selectedPersonaId,
+      nombreCompleto: nombre.trim(),
+      gtId: selectedGtId,
       eventoId: activeEvento.id,
-      turnoId: activeTurno?.id,
+      turnoId: activeTurno?.id || null,
       origen: 'qr',
     });
 
-    setResultData({
-      ...res,
-      gtId: selectedPersona?.gtId,
-    });
+    setResultData(res);
     setSubmitted(true);
 
     if (res.success) {
-      // Fire vibrant celebration confetti
+      // Vibrant celebration confetti
       confetti({
         particleCount: 120,
         spread: 80,
@@ -174,6 +157,8 @@ export const ParticipantRegisterView: React.FC<ParticipantRegisterViewProps> = (
       });
     }
   };
+
+  const selectedGt = gts.find((g) => g.id === selectedGtId);
 
   return (
     <div className="w-full max-w-2xl mx-auto py-4 px-4 sm:px-6">
@@ -194,7 +179,7 @@ export const ParticipantRegisterView: React.FC<ParticipantRegisterViewProps> = (
                 DIAS LEAGUE • EAFIT
               </span>
               <span className="text-[11px] text-slate-400">
-                Registro Express de Participación
+                Registro Express por QR (Solo Nombre y GT)
               </span>
             </div>
           </div>
@@ -207,10 +192,28 @@ export const ParticipantRegisterView: React.FC<ParticipantRegisterViewProps> = (
         <div className="bg-gradient-to-r from-slate-800/90 to-slate-800/50 border border-slate-700 rounded-2xl p-4 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 block">
-                Evento Identificado
-              </span>
-              <h2 className="text-xl font-black text-white">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 block">
+                  Conectado / Evento
+                </span>
+                {eventos.length > 1 && (
+                  <select
+                    value={selectedEventoId}
+                    onChange={(e) => {
+                      setSelectedEventoId(e.target.value);
+                      setSubmitted(false);
+                    }}
+                    className="bg-slate-900 text-slate-300 text-[11px] font-semibold border border-slate-700 rounded px-2 py-0.5"
+                  >
+                    {eventos.map((ev) => (
+                      <option key={ev.id} value={ev.id}>
+                        {ev.nombre} ({ev.puntosAsistencia} pts)
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <h2 className="text-xl font-black text-white mt-0.5">
                 {activeEvento?.nombre}
               </h2>
               {activeTurno && (
@@ -237,10 +240,10 @@ export const ParticipantRegisterView: React.FC<ParticipantRegisterViewProps> = (
             </div>
           </div>
 
-          {/* Shift selector toggle if needed */}
+          {/* Shift selector toggle if multiple shifts */}
           {availableTurnos.length > 1 && (
             <div className="mt-3 pt-3 border-t border-slate-700/60 flex items-center gap-2 text-xs">
-              <span className="text-slate-400">Cambiar turno:</span>
+              <span className="text-slate-400">Turno activo:</span>
               <select
                 value={activeTurno?.id}
                 onChange={(e) => {
@@ -251,7 +254,7 @@ export const ParticipantRegisterView: React.FC<ParticipantRegisterViewProps> = (
               >
                 {availableTurnos.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.nombre} ({t.horaInicio} - {t.horaFin})
+                    {t.nombre} ({t.horaInicio} - {t.horaFin}) {t.activo ? '🟢' : ''}
                   </option>
                 ))}
               </select>
@@ -270,27 +273,27 @@ export const ParticipantRegisterView: React.FC<ParticipantRegisterViewProps> = (
 
                 <div>
                   <h3 className="text-2xl font-black text-white">
-                    ¡Participación Registrada!
+                    ¡Asistencia Registrada!
                   </h3>
                   <p className="text-base text-amber-300 font-bold mt-1">
-                    Has ganado +{resultData.puntos} DIAS Points individuales
+                    +{resultData.puntos} DIAS Points sumados a tu GT
                   </p>
                   <p className="text-sm text-slate-300 mt-1">
-                    Tu Grupo de Trabajo ({resultData.gtNombre}) también suma puntos brutos y se actualiza en el podio.
+                    Tu participación se ha contabilizado para la asistencia y el Resultado General del Conectado.
                   </p>
                 </div>
 
                 <div className="p-4 bg-slate-800/80 rounded-2xl border border-slate-700 max-w-sm mx-auto text-left text-xs space-y-1 text-slate-300">
                   <div className="flex justify-between">
                     <span className="text-slate-400">Integrante:</span>
-                    <span className="font-bold text-white">{selectedPersona?.nombreCompleto}</span>
+                    <span className="font-bold text-white">{resultData.personaNombre || nombre}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400">Grupo de Trabajo (GT):</span>
-                    <span className="font-bold text-amber-400">{resultData.gtNombre}</span>
+                    <span className="font-bold text-amber-400">{resultData.gtNombre || selectedGt?.nombre}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Evento:</span>
+                    <span className="text-slate-400">Conectado / Evento:</span>
                     <span>{activeEvento?.nombre}</span>
                   </div>
                   {activeTurno && (
@@ -307,17 +310,16 @@ export const ParticipantRegisterView: React.FC<ParticipantRegisterViewProps> = (
                     className="w-full sm:w-auto px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2"
                   >
                     <Trophy className="w-4 h-4 text-amber-300" />
-                    Ver Podio y Rankings
+                    Ver Podio y Resultados
                   </button>
                   <button
                     onClick={() => {
                       setSubmitted(false);
-                      setSelectedPersonaId('');
-                      setSearchQuery('');
+                      setNombre('');
                     }}
                     className="w-full sm:w-auto px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold"
                   >
-                    Registrar a otra persona
+                    Registrar a otro integrante
                   </button>
                 </div>
               </div>
@@ -344,41 +346,42 @@ export const ParticipantRegisterView: React.FC<ParticipantRegisterViewProps> = (
             )}
           </div>
         ) : (
-          /* REGISTRATION FORM */
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Person Search & Autocomplete */}
+          /* SIMPLIFIED FORM: NAME + GT ONLY */
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Field 1: Name with smart suggestion */}
             <div className="relative">
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
-                Identifícate con tu nombre completo
+                1. Tu Nombre Completo
               </label>
 
               <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   id="input-persona-nombre"
                   type="text"
-                  placeholder="Escribe tu nombre para buscar..."
-                  value={searchQuery}
+                  placeholder="Ej. Sofia Gomez, Juan David Perez..."
+                  value={nombre}
                   onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setIsDropdownOpen(true);
-                    setSelectedPersonaId('');
+                    setNombre(e.target.value);
+                    setShowSuggestions(true);
                   }}
-                  onFocus={() => setIsDropdownOpen(true)}
-                  className="w-full bg-slate-800 text-white pl-10 pr-4 py-3 rounded-2xl border border-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm placeholder-slate-500 font-medium"
+                  onFocus={() => setShowSuggestions(true)}
+                  className="w-full bg-slate-800 text-white px-4 py-3.5 rounded-2xl border border-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500 text-base font-medium placeholder-slate-500 shadow-inner"
                   required
                 />
               </div>
 
-              {/* Autocomplete Dropdown */}
-              {isDropdownOpen && filteredPersonas.length > 0 && !selectedPersonaId && (
-                <div className="absolute z-30 left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl max-h-56 overflow-y-auto divide-y divide-slate-700/60">
-                  {filteredPersonas.map((p) => {
+              {/* Suggestions dropdown if matches known member */}
+              {showSuggestions && matchingPersonas.length > 0 && (
+                <div className="absolute z-30 left-0 right-0 mt-1.5 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden divide-y divide-slate-700/60">
+                  <div className="px-3 py-1.5 bg-slate-850 text-[11px] font-bold text-slate-400">
+                    Sugerencias de integrantes:
+                  </div>
+                  {matchingPersonas.map((p) => {
                     const gt = gts.find((g) => g.id === p.gtId);
                     return (
                       <div
                         key={p.id}
-                        onClick={() => handleSelectPersona(p.id, p.nombreCompleto)}
+                        onClick={() => handleSelectSuggestion(p)}
                         className="p-3 hover:bg-slate-700 cursor-pointer flex items-center justify-between transition-colors"
                       >
                         <span className="font-semibold text-white text-sm">
@@ -397,117 +400,89 @@ export const ParticipantRegisterView: React.FC<ParticipantRegisterViewProps> = (
               )}
             </div>
 
-            {/* Selected Person Card Preview */}
-            {selectedPersona && selectedGt && (
-              <div className="p-4 rounded-2xl bg-slate-800/90 border border-indigo-500/40 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-sm shadow"
-                    style={{ backgroundColor: selectedGt.color }}
-                  >
-                    {selectedGt.codigo}
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-white text-sm">
-                      {selectedPersona.nombreCompleto}
-                    </h4>
-                    <span className="text-xs text-indigo-300 font-medium">
-                      GT: {selectedGt.nombre}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedPersonaId('');
-                    setSearchQuery('');
-                  }}
-                  className="text-xs text-slate-400 hover:text-white underline"
+            {/* Field 2: GT Selection */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">
+                2. Selecciona tu Grupo de Trabajo (GT)
+              </label>
+
+              {/* GT Grid buttons for instant 1-tap selection on mobile or desktop */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {gts.map((gt) => {
+                  const isSelected = selectedGtId === gt.id;
+                  return (
+                    <button
+                      key={gt.id}
+                      type="button"
+                      onClick={() => setSelectedGtId(gt.id)}
+                      className={`p-3 rounded-2xl border text-left transition-all flex items-center gap-2.5 ${
+                        isSelected
+                          ? 'bg-slate-800 ring-2 ring-amber-400 border-amber-400/80 shadow-lg scale-[1.02]'
+                          : 'bg-slate-800/60 border-slate-700/80 hover:bg-slate-800 hover:border-slate-600'
+                      }`}
+                    >
+                      <div
+                        className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-xs shrink-0 shadow"
+                        style={{ backgroundColor: gt.color }}
+                      >
+                        {gt.codigo}
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-white block truncate">
+                          {gt.nombre}
+                        </span>
+                        <span className="text-[10px] text-slate-400 block">
+                          {gt.totalIntegrantes} miembros
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Selected GT Confirmation Banner */}
+            {selectedGt && (
+              <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700 flex items-center justify-between text-xs">
+                <span className="text-slate-300">
+                  GT seleccionado:{' '}
+                  <strong className="text-white font-bold">{selectedGt.nombre}</strong>
+                </span>
+                <span
+                  className="px-2.5 py-0.5 rounded-full text-white text-[11px] font-extrabold"
+                  style={{ backgroundColor: selectedGt.color }}
                 >
-                  Cambiar
-                </button>
+                  {selectedGt.codigo}
+                </span>
               </div>
             )}
 
             {/* DUPLICATE WARNING */}
             {duplicateStatus && (
-              <div className="p-4 bg-red-950/40 border-2 border-red-500/60 rounded-2xl flex items-start gap-3">
+              <div className="p-4 bg-red-950/50 border-2 border-red-500/70 rounded-2xl flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
                 <div>
                   <h4 className="font-bold text-red-200 text-sm">
-                    Ya registraste tu participación en este turno
+                    Ya registraste tu asistencia para este Conectado
                   </h4>
-                  <p className="text-xs text-red-300/80 mt-0.5">
-                    El sistema protege la integridad de la liga impidiendo registros duplicados para una misma persona y turno. No puedes volver a recibir puntos en este turno.
+                  <p className="text-xs text-red-300/90 mt-0.5">
+                    El sistema protege la integridad de la liga impidiendo registros duplicados para una misma persona y evento.
                   </p>
                 </div>
               </div>
             )}
 
-            {/* Option to create person if not in mock list */}
-            {!selectedPersonaId && (
-              <div className="text-right">
-                <button
-                  type="button"
-                  onClick={() => setIsAddingNew(!isAddingNew)}
-                  className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold inline-flex items-center gap-1"
-                >
-                  <PlusCircle className="w-3.5 h-3.5" />
-                  ¿No estás en la lista? Regístrate aquí
-                </button>
-              </div>
-            )}
-
-            {/* Quick Registration Form for New Person */}
-            {isAddingNew && !selectedPersonaId && (
-              <div className="p-4 bg-slate-800/90 border border-slate-700 rounded-2xl space-y-3">
-                <h5 className="font-bold text-white text-xs uppercase tracking-wider">
-                  Nuevo Integrante
-                </h5>
-                <div>
-                  <input
-                    type="text"
-                    placeholder="Tu nombre completo..."
-                    value={newNombre}
-                    onChange={(e) => setNewNombre(e.target.value)}
-                    className="w-full bg-slate-900 text-white text-xs p-2.5 rounded-xl border border-slate-700"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-xs text-slate-400 shrink-0">Tu GT:</label>
-                  <select
-                    value={newGtId}
-                    onChange={(e) => setNewGtId(e.target.value)}
-                    className="w-full bg-slate-900 text-white text-xs p-2 rounded-xl border border-slate-700"
-                  >
-                    {gts.map((gt) => (
-                      <option key={gt.id} value={gt.id}>
-                        {gt.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleCreateAndSelect}
-                  className="w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold"
-                >
-                  Agregarme y Seleccionar
-                </button>
-              </div>
-            )}
-
-            {/* Action Button */}
+            {/* Submit Button */}
             <div className="pt-2">
               <button
                 id="btn-confirmar-asistencia"
                 type="submit"
-                disabled={!selectedPersonaId || !!duplicateStatus}
-                className={`w-full py-3.5 px-6 rounded-2xl font-black text-base shadow-xl flex items-center justify-center gap-2 transition-all ${
+                disabled={!nombre.trim() || !selectedGtId || !!duplicateStatus}
+                className={`w-full py-4 px-6 rounded-2xl font-black text-base shadow-xl flex items-center justify-center gap-2 transition-all ${
                   duplicateStatus
                     ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
-                    : selectedPersonaId
-                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 shadow-amber-500/25 hover:scale-[1.01]'
+                    : nombre.trim() && selectedGtId
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 shadow-amber-500/25 hover:scale-[1.01] cursor-pointer'
                     : 'bg-slate-800 text-slate-400 border border-slate-700 cursor-not-allowed'
                 }`}
               >
@@ -518,13 +493,13 @@ export const ParticipantRegisterView: React.FC<ParticipantRegisterViewProps> = (
           </form>
         )}
 
-        {/* Security and Transparency Footer */}
+        {/* Security Footer */}
         <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500">
           <span className="flex items-center gap-1">
             <Shield className="w-3.5 h-3.5 text-slate-400" />
-            Validación anti-duplicados activa
+            Sin necesidad de contraseña • Sistema de Integridad DIAS LEAGUE
           </span>
-          <span>DIAS LEAGUE 2026</span>
+          <span>EAFIT 2026</span>
         </div>
       </div>
     </div>

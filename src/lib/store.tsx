@@ -27,6 +27,7 @@ import {
   TEMPORADA_ACTIVA_ID,
 } from './mockData';
 import { calcularRankingGts, calcularRankingPersonas } from './calculator';
+import { getSupabase } from './supabase';
 
 export type ActiveTab =
   | 'dashboard'
@@ -95,11 +96,13 @@ interface AppContextType {
 
   // Actions - Asistencia & QR
   registrarAsistencia: (params: {
-    personaId: string;
+    personaId?: string;
+    nombreCompleto?: string;
+    gtId?: string;
     eventoId: string;
     turnoId?: string | null;
     origen?: 'qr' | 'manual';
-  }) => { success: boolean; message: string; puntos?: number; gtNombre?: string };
+  }) => { success: boolean; message: string; puntos?: number; gtNombre?: string; personaNombre?: string };
 
   // Actions - GT
   crearGt: (gt: Omit<GrupoTrabajo, 'id' | 'createdAt'>) => void;
@@ -122,6 +125,7 @@ interface AppContextType {
   crearEvento: (evento: Omit<Evento, 'id' | 'createdAt'>) => void;
   actualizarEvento: (id: string, updates: Partial<Evento>) => void;
   cambiarEstadoEvento: (id: string, nuevoEstado: Evento['estado']) => void;
+  eliminarEvento: (id: string) => void;
 
   // Actions - Turnos
   crearTurno: (turno: Omit<Turno, 'id' | 'createdAt' | 'qrToken'>) => void;
@@ -132,6 +136,7 @@ interface AppContextType {
   // Actions - Retos
   crearReto: (reto: Omit<Reto, 'id' | 'createdAt'>) => void;
   actualizarReto: (id: string, updates: Partial<Reto>) => void;
+  eliminarReto: (id: string) => void;
   asignarGanadorReto: (params: {
     retoId: string;
     gtId: string;
@@ -152,13 +157,28 @@ interface AppContextType {
   // Data reset & test data controls
   restablecerDatosPrueba: () => void;
   limpiarTodosLosDatos: () => void;
+  limpiarDatosPrueba: () => Promise<void>;
+  importarPersonasMasivo: (personas: Array<{ nombreCompleto: string; gtId: string }>) => Promise<{ success: boolean; count: number; error?: string }>;
+  registrarPuntosPersonaManual: (params: {
+    personaId: string;
+    gtId: string;
+    eventoId: string;
+    puntos: number;
+    motivo?: string;
+  }) => Promise<{ success: boolean; message: string }>;
+  registrarPuntosGtManual: (params: {
+    gtId: string;
+    eventoId: string;
+    puntos: number;
+    motivo?: string;
+  }) => Promise<{ success: boolean; message: string }>;
 
   // Admin session
   isAdmin: boolean;
   setIsAdmin: (val: boolean) => void;
 }
 
-const STORAGE_KEY = 'dias_league_state_v1';
+const STORAGE_KEY = 'dias_league_state_v2';
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -289,7 +309,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [gts, personas, asistencias, participacionesRetos, factores, temporadaActiva]);
 
   const podio = useMemo(() => {
-    return rankingGts.slice(0, 3);
+    // Only show GTs that have points (> 0), up to top 3
+    const conPuntos = rankingGts.filter((g) => g.diasPointsFinal > 0);
+    return conPuntos.slice(0, 3);
   }, [rankingGts]);
 
   const rankingPersonas = useMemo(() => {
@@ -415,22 +437,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const registrarAsistencia = useCallback(
     ({
       personaId,
+      nombreCompleto,
+      gtId,
       eventoId,
       turnoId,
       origen = 'qr',
     }: {
-      personaId: string;
+      personaId?: string;
+      nombreCompleto?: string;
+      gtId?: string;
       eventoId: string;
       turnoId?: string | null;
       origen?: 'qr' | 'manual';
     }) => {
       if (!temporadaActiva) {
         return { success: false, message: 'No hay ninguna temporada activa.' };
-      }
-
-      const persona = personas.find((p) => p.id === personaId);
-      if (!persona || !persona.activo) {
-        return { success: false, message: 'Persona no encontrada o inactiva en el sistema.' };
       }
 
       const evento = eventos.find((e) => e.id === eventoId);
@@ -449,11 +470,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
+      // Resolve or auto-create persona
+      let persona: Persona | undefined;
+      if (personaId) {
+        persona = personas.find((p) => p.id === personaId);
+      } else if (nombreCompleto?.trim() && gtId) {
+        const cleanName = nombreCompleto.trim().toLowerCase();
+        persona = personas.find(
+          (p) => p.gtId === gtId && p.nombreCompleto.trim().toLowerCase() === cleanName
+        );
+        if (!persona) {
+          // Auto-create person so their GT gets credited
+          const newPersona: Persona = {
+            id: 'per-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+            nombreCompleto: nombreCompleto.trim(),
+            gtId: gtId,
+            activo: true,
+            createdAt: new Date().toISOString(),
+          };
+          setPersonas((prev) => [...prev, newPersona]);
+          persona = newPersona;
+          addAuditLog('CREAR_PERSONA', 'persona', newPersona.id, `Persona creada al registrar asistencia: ${newPersona.nombreCompleto}`);
+        }
+      }
+
+      if (!persona || !persona.activo) {
+        return { success: false, message: 'Por favor ingresa tu nombre y selecciona tu Grupo de Trabajo (GT).' };
+      }
+
       // STRICT DUPLICATE CHECK:
       // Prevent user from scanning multiple times for the same shift or event
+      const targetPersonaId = persona.id;
       const yaRegistrado = asistencias.some((a) => {
         if (a.anulado) return false;
-        if (a.personaId !== personaId) return false;
+        if (a.personaId !== targetPersonaId) return false;
         if (a.eventoId !== eventoId) return false;
         if (a.temporadaId !== temporadaActiva.id) return false;
 
@@ -468,7 +518,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (yaRegistrado) {
         return {
           success: false,
-          message: 'Ya registraste tu participación en este turno. No puedes volver a recibir puntos.',
+          message: 'Ya registraste tu asistencia para este Conectado. No se permiten registros duplicados.',
         };
       }
 
@@ -477,7 +527,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const nuevaAsistencia: Asistencia = {
         id: 'asist-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
-        personaId,
+        personaId: persona.id,
         eventoId,
         turnoId: turnoId || null,
         temporadaId: temporadaActiva.id,
@@ -498,9 +548,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       return {
         success: true,
-        message: '¡Participación registrada!',
+        message: '¡Asistencia registrada con éxito!',
         puntos,
         gtNombre: gt?.nombre || 'tu GT',
+        personaNombre: persona.nombreCompleto,
       };
     },
     [temporadaActiva, personas, eventos, turnos, asistencias, gts, addAuditLog]
@@ -681,6 +732,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [addAuditLog]
   );
 
+  const eliminarEvento = useCallback(
+    (id: string) => {
+      const e = eventos.find((item) => item.id === id);
+      setEventos((prev) => prev.filter((item) => item.id !== id));
+      setTurnos((prev) => prev.filter((t) => t.eventoId !== id));
+      setAsistencias((prev) => prev.filter((a) => a.eventoId !== id));
+      addAuditLog('ELIMINAR_EVENTO', 'evento', id, `Se eliminó el evento ${e?.nombre || id}`);
+    },
+    [eventos, addAuditLog]
+  );
+
   // Turnos & QR
   const crearTurno = useCallback(
     (data: Omit<Turno, 'id' | 'createdAt' | 'qrToken'>) => {
@@ -756,6 +818,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addAuditLog('ACTUALIZAR_RETO', 'reto', id, `Actualización de reto`);
     },
     [addAuditLog]
+  );
+
+  const eliminarReto = useCallback(
+    (id: string) => {
+      const r = retos.find((item) => item.id === id);
+      setRetos((prev) => prev.filter((item) => item.id !== id));
+      setParticipacionesRetos((prev) => prev.filter((pr) => pr.retoId !== id));
+      addAuditLog('ELIMINAR_RETO', 'reto', id, `Se eliminó el reto ${r?.nombre || id}`);
+    },
+    [retos, addAuditLog]
   );
 
   const asignarGanadorReto = useCallback(
@@ -901,6 +973,199 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addAuditLog('LIMPIAR_DATOS', 'sistema', 'all', 'Se limpiaron todas las personas, eventos y asistencias');
   }, [addAuditLog]);
 
+  // Clean test data only (personas, asistencias, participaciones_retos) leaving GTs, eventos, temporadas, factores intact
+  const limpiarDatosPrueba = useCallback(async () => {
+    setPersonas([]);
+    setAsistencias([]);
+    setParticipacionesRetos([]);
+
+    localStorage.setItem(STORAGE_KEY + '_personas', JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEY + '_asistencias', JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEY + '_participacionesRetos', JSON.stringify([]));
+
+    // Delete test records in Supabase if active
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        await supabase.from('asistencias').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('participaciones_retos').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        await supabase.from('personas').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      } catch (err) {
+        console.warn('Supabase delete warning:', err);
+      }
+    }
+
+    addAuditLog(
+      'LIMPIEZA_DATOS_PRUEBA',
+      'sistema',
+      'all',
+      'Se eliminaron todas las personas, participaciones y puntos de prueba. GTs, eventos, temporadas y factores preservados.'
+    );
+  }, [addAuditLog]);
+
+  // Bulk import persons from validated Excel rows
+  const importarPersonasMasivo = useCallback(
+    async (personasAImportar: Array<{ nombreCompleto: string; gtId: string }>) => {
+      const now = new Date().toISOString();
+      const nuevas: Persona[] = personasAImportar.map((p, idx) => ({
+        id: `per-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
+        nombreCompleto: p.nombreCompleto.trim(),
+        gtId: p.gtId,
+        activo: true,
+        createdAt: now,
+      }));
+
+      setPersonas((prev) => [...prev, ...nuevas]);
+
+      // Save to Supabase if connected
+      const supabase = getSupabase();
+      if (supabase) {
+        try {
+          await supabase.from('personas').insert(
+            nuevas.map((p) => ({
+              id: p.id,
+              nombre_completo: p.nombreCompleto,
+              gt_id: p.gtId,
+              activo: p.activo,
+              created_at: p.createdAt,
+            }))
+          );
+        } catch (err) {
+          console.warn('Supabase bulk insert warning:', err);
+        }
+      }
+
+      addAuditLog(
+        'IMPORTACION_EXCEL',
+        'persona',
+        'masivo',
+        `Se importaron ${nuevas.length} personas exitosamente desde archivo Excel.`
+      );
+
+      return { success: true, count: nuevas.length };
+    },
+    [addAuditLog]
+  );
+
+  // Register points to a specific person manually
+  const registrarPuntosPersonaManual = useCallback(
+    async (params: {
+      personaId: string;
+      gtId: string;
+      eventoId: string;
+      puntos: number;
+      motivo?: string;
+    }) => {
+      const targetPersona = personas.find((p) => p.id === params.personaId);
+      const targetGt = gts.find((g) => g.id === params.gtId);
+      const targetEvento = eventos.find((e) => e.id === params.eventoId);
+
+      const now = new Date().toISOString();
+      const nuevaAsistencia: Asistencia = {
+        id: `asist-man-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        personaId: params.personaId,
+        eventoId: params.eventoId,
+        temporadaId: activeTemporadaId,
+        gtId: params.gtId,
+        puntosOtorgados: Number(params.puntos) || 0,
+        fechaRegistro: now,
+        origen: 'manual',
+        anuladoMotivo: params.motivo,
+      };
+
+      setAsistencias((prev) => [nuevaAsistencia, ...prev]);
+
+      const supabase = getSupabase();
+      if (supabase) {
+        try {
+          await supabase.from('asistencias').insert({
+            id: nuevaAsistencia.id,
+            persona_id: nuevaAsistencia.personaId,
+            evento_id: nuevaAsistencia.eventoId,
+            temporada_id: nuevaAsistencia.temporadaId,
+            gt_id: nuevaAsistencia.gtId,
+            puntos_otorgados: nuevaAsistencia.puntosOtorgados,
+            origen: 'manual',
+            fecha_registro: nuevaAsistencia.fechaRegistro,
+          });
+        } catch (err) {
+          console.warn('Supabase manual attendance points error:', err);
+        }
+      }
+
+      addAuditLog(
+        'REGISTRO_PUNTOS_PERSONA',
+        'asistencia',
+        nuevaAsistencia.id,
+        `+${params.puntos} pts otorgados a ${targetPersona?.nombreCompleto || 'Persona'} (${targetGt?.nombre}) en ${targetEvento?.nombre || 'Evento'}${params.motivo ? ` [${params.motivo}]` : ''}`
+      );
+
+      return {
+        success: true,
+        message: `Se registraron ${params.puntos} puntos a ${targetPersona?.nombreCompleto || 'la persona'} (${targetGt?.nombre}).`,
+      };
+    },
+    [personas, gts, eventos, activeTemporadaId, addAuditLog]
+  );
+
+  // Register points directly to a GT manually
+  const registrarPuntosGtManual = useCallback(
+    async (params: {
+      gtId: string;
+      eventoId: string;
+      puntos: number;
+      motivo?: string;
+    }) => {
+      const targetGt = gts.find((g) => g.id === params.gtId);
+      const targetEvento = eventos.find((e) => e.id === params.eventoId);
+
+      const now = new Date().toISOString();
+      const nuevaParticipacion: ParticipacionReto = {
+        id: `pret-man-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        retoId: retos[0]?.id || 'reto-directo',
+        eventoId: params.eventoId,
+        temporadaId: activeTemporadaId,
+        gtId: params.gtId,
+        puntosOtorgados: Number(params.puntos) || 0,
+        observacion: params.motivo || 'Puntos directos asignados a GT',
+        fechaRegistro: now,
+      };
+
+      setParticipacionesRetos((prev) => [nuevaParticipacion, ...prev]);
+
+      const supabase = getSupabase();
+      if (supabase) {
+        try {
+          await supabase.from('participaciones_retos').insert({
+            id: nuevaParticipacion.id,
+            reto_id: nuevaParticipacion.retoId,
+            evento_id: nuevaParticipacion.eventoId,
+            temporada_id: nuevaParticipacion.temporadaId,
+            gt_id: nuevaParticipacion.gtId,
+            puntos_otorgados: nuevaParticipacion.puntosOtorgados,
+            observacion: nuevaParticipacion.observacion,
+            fecha_registro: nuevaParticipacion.fechaRegistro,
+          });
+        } catch (err) {
+          console.warn('Supabase GT direct points error:', err);
+        }
+      }
+
+      addAuditLog(
+        'REGISTRO_PUNTOS_GT',
+        'gt',
+        params.gtId,
+        `+${params.puntos} pts directos asignados a GT ${targetGt?.nombre} en ${targetEvento?.nombre || 'Evento'}${params.motivo ? ` [${params.motivo}]` : ''}`
+      );
+
+      return {
+        success: true,
+        message: `Se registraron ${params.puntos} puntos directos al GT ${targetGt?.nombre}.`,
+      };
+    },
+    [gts, eventos, retos, activeTemporadaId, addAuditLog]
+  );
+
   const value = useMemo(
     () => ({
       activeTab,
@@ -937,12 +1202,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       crearEvento,
       actualizarEvento,
       cambiarEstadoEvento,
+      eliminarEvento,
       crearTurno,
       actualizarTurno,
       activarTurno,
       cerrarTurno,
       crearReto,
       actualizarReto,
+      eliminarReto,
       asignarGanadorReto,
       actualizarFactor,
       actualizarRangoFactor,
@@ -950,6 +1217,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       anularParticipacionReto,
       restablecerDatosPrueba,
       limpiarTodosLosDatos,
+      limpiarDatosPrueba,
+      importarPersonasMasivo,
+      registrarPuntosPersonaManual,
+      registrarPuntosGtManual,
       isAdmin,
       setIsAdmin,
     }),
@@ -985,12 +1256,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       crearEvento,
       actualizarEvento,
       cambiarEstadoEvento,
+      eliminarEvento,
       crearTurno,
       actualizarTurno,
       activarTurno,
       cerrarTurno,
       crearReto,
       actualizarReto,
+      eliminarReto,
       asignarGanadorReto,
       actualizarFactor,
       actualizarRangoFactor,
@@ -998,6 +1271,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       anularParticipacionReto,
       restablecerDatosPrueba,
       limpiarTodosLosDatos,
+      limpiarDatosPrueba,
+      importarPersonasMasivo,
+      registrarPuntosPersonaManual,
+      registrarPuntosGtManual,
       isAdmin,
       activeTab,
     ]

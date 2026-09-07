@@ -13,8 +13,18 @@ export const Podium: React.FC<PodiumProps> = ({ podio, onSelectGt }) => {
   const second = podio[1];
   const third = podio[2];
 
-  if (!first) {
-    return null;
+  if (!first || first.diasPointsFinal === 0) {
+    return (
+      <div className="w-full bg-slate-900/80 border border-slate-800 rounded-3xl p-8 text-center relative overflow-hidden shadow-xl">
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto mb-4 text-amber-400">
+          <Trophy className="w-8 h-8 opacity-80" />
+        </div>
+        <h3 className="text-xl font-bold text-white mb-2">El ranking todavía no tiene puntos.</h3>
+        <p className="text-sm text-slate-400 max-w-md mx-auto">
+          El podio y los líderes oficiales se mostrarán automáticamente una vez se registren las primeras participaciones o asistencias reales.
+        </p>
+      </div>
+    );
   }
 
   return (

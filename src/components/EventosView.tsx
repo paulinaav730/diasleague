@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../lib/store';
 import { Evento, Turno, Reto } from '../types';
+import { ConectadoDetalleModal } from './ConectadoDetalleModal';
 import {
   Calendar,
   Clock,
@@ -223,30 +224,50 @@ export const EventosView: React.FC<EventosViewProps> = ({
               </div>
 
               {/* Action Buttons */}
-              <div className="mt-6 pt-3 border-t border-slate-800 flex items-center gap-2">
-                {evento.utilizaQr && (
-                  <button
-                    onClick={() => onOpenQrProjector(evento.id)}
-                    className="flex-1 py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow"
-                    title="Proyectar QR en pantalla grande"
-                  >
-                    <Tv className="w-3.5 h-3.5" />
-                    <span>Ver QR Proyector</span>
-                  </button>
-                )}
-
+              <div className="mt-6 pt-3 border-t border-slate-800 space-y-2">
                 <button
-                  onClick={() => onOpenRegister(evento.id)}
-                  className="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white text-xs font-semibold flex items-center justify-center gap-1"
+                  onClick={() => setSelectedEventoId(evento.id)}
+                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/20 transition-transform active:scale-[0.99]"
                 >
-                  <span>Registrar</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Gestionar Conectado, Retos y Calificación</span>
                 </button>
+
+                <div className="flex items-center gap-2">
+                  {evento.utilizaQr && (
+                    <button
+                      onClick={() => onOpenQrProjector(evento.id)}
+                      className="flex-1 py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow"
+                      title="Proyectar QR en pantalla grande"
+                    >
+                      <Tv className="w-3.5 h-3.5" />
+                      <span>Ver QR</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => onOpenRegister(evento.id)}
+                    className="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white text-xs font-semibold flex items-center justify-center gap-1"
+                  >
+                    <span>Registrar</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* Modal for Conectado Details, Challenges and Score Sheet */}
+      {selectedEventoId && (
+        <ConectadoDetalleModal
+          eventoId={selectedEventoId}
+          onClose={() => setSelectedEventoId(null)}
+          onOpenQrProjector={onOpenQrProjector}
+          onOpenRegister={onOpenRegister}
+        />
+      )}
 
       {/* Create Event Modal */}
       {showCreateModal && (

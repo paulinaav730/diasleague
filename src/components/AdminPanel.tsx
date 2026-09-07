@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../lib/store';
 import { Evento } from '../types';
+import { ExcelImportSection } from './admin/ExcelImportSection';
+import { ManualPointsSection } from './admin/ManualPointsSection';
 import {
   Shield,
   Trophy,
@@ -23,15 +25,19 @@ import {
   CheckCircle2,
   Database,
   ExternalLink,
+  FileSpreadsheet,
+  Award,
 } from 'lucide-react';
 
 type AdminTab =
-  | 'temporadas'
-  | 'gts'
+  | 'importar_personas'
+  | 'registrar_puntos'
   | 'personas'
   | 'eventos_turnos'
   | 'retos'
   | 'factores'
+  | 'gts'
+  | 'temporadas'
   | 'auditoria'
   | 'datos';
 
@@ -74,9 +80,10 @@ export const AdminPanel: React.FC = () => {
     anularParticipacionReto,
     restablecerDatosPrueba,
     limpiarTodosLosDatos,
+    limpiarDatosPrueba,
   } = useApp();
 
-  const [activeAdminTab, setActiveAdminTab] = useState<AdminTab>('eventos_turnos');
+  const [activeAdminTab, setActiveAdminTab] = useState<AdminTab>('importar_personas');
 
   // Season creation state
   const [newTempName, setNewTempName] = useState('');
@@ -86,6 +93,7 @@ export const AdminPanel: React.FC = () => {
   // Person creation state
   const [newPersonaNombre, setNewPersonaNombre] = useState('');
   const [newPersonaGtId, setNewPersonaGtId] = useState(gts[0]?.id || '');
+  const [personaFilterText, setPersonaFilterText] = useState('');
 
   // Challenge winner assignment state
   const [selectedRetoId, setSelectedRetoId] = useState(retos[0]?.id || '');
@@ -131,7 +139,25 @@ export const AdminPanel: React.FC = () => {
           </div>
 
           {/* Quick Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={async () => {
+                if (
+                  window.confirm(
+                    '¿Deseas realizar la limpieza de datos de prueba?\n\nEsta acción eliminará todas las personas, asistencias y participaciones de prueba para que puedas cargar los datos reales.\n\nLos GTs, eventos, temporadas, retos y factores permanecerán INTACTOS.'
+                  )
+                ) {
+                  await limpiarDatosPrueba();
+                  showFeedback('¡Limpieza completada! Personas y puntos en 0. GTs y eventos preservados.');
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 border border-rose-500/40 text-xs text-rose-300 font-bold transition-colors cursor-pointer"
+              title="Elimina datos de prueba y deja personas y puntos en 0"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              Limpieza Datos de Prueba
+            </button>
+
             <button
               onClick={() => {
                 if (window.confirm('¿Deseas restaurar todos los datos de prueba iniciales de la Organización Estudiantil DIAS EAFIT?')) {
@@ -139,7 +165,7 @@ export const AdminPanel: React.FC = () => {
                   showFeedback('¡Datos iniciales de prueba restaurados con éxito!');
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-amber-300 font-bold transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-amber-300 font-bold transition-colors cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               Restablecer Datos EAFIT
@@ -150,7 +176,7 @@ export const AdminPanel: React.FC = () => {
         {/* Feedback Alert */}
         {feedbackMsg && (
           <div className="mt-4 p-3 bg-emerald-950/60 border border-emerald-500/50 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4" />
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
             <span>{feedbackMsg}</span>
           </div>
         )}
@@ -158,8 +184,44 @@ export const AdminPanel: React.FC = () => {
         {/* Secondary Admin Navigation Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto pt-6 border-t border-slate-800/80 mt-6 text-xs font-semibold">
           <button
+            onClick={() => setActiveAdminTab('importar_personas')}
+            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
+              activeAdminTab === 'importar_personas'
+                ? 'bg-emerald-600 text-white shadow'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span>Importar personas (Excel)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveAdminTab('registrar_puntos')}
+            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
+              activeAdminTab === 'registrar_puntos'
+                ? 'bg-amber-600 text-white shadow'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Award className="w-3.5 h-3.5" />
+            <span>Registrar puntos</span>
+          </button>
+
+          <button
+            onClick={() => setActiveAdminTab('personas')}
+            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
+              activeAdminTab === 'personas'
+                ? 'bg-purple-600 text-white shadow'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Integrantes ({personas.length})</span>
+          </button>
+
+          <button
             onClick={() => setActiveAdminTab('eventos_turnos')}
-            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
               activeAdminTab === 'eventos_turnos'
                 ? 'bg-purple-600 text-white shadow'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
@@ -171,7 +233,7 @@ export const AdminPanel: React.FC = () => {
 
           <button
             onClick={() => setActiveAdminTab('retos')}
-            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
               activeAdminTab === 'retos'
                 ? 'bg-purple-600 text-white shadow'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
@@ -183,7 +245,7 @@ export const AdminPanel: React.FC = () => {
 
           <button
             onClick={() => setActiveAdminTab('factores')}
-            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
               activeAdminTab === 'factores'
                 ? 'bg-purple-600 text-white shadow'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
@@ -194,20 +256,8 @@ export const AdminPanel: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setActiveAdminTab('personas')}
-            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 ${
-              activeAdminTab === 'personas'
-                ? 'bg-purple-600 text-white shadow'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>Integrantes</span>
-          </button>
-
-          <button
             onClick={() => setActiveAdminTab('gts')}
-            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
               activeAdminTab === 'gts'
                 ? 'bg-purple-600 text-white shadow'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
@@ -219,7 +269,7 @@ export const AdminPanel: React.FC = () => {
 
           <button
             onClick={() => setActiveAdminTab('temporadas')}
-            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
               activeAdminTab === 'temporadas'
                 ? 'bg-purple-600 text-white shadow'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
@@ -231,7 +281,7 @@ export const AdminPanel: React.FC = () => {
 
           <button
             onClick={() => setActiveAdminTab('auditoria')}
-            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
               activeAdminTab === 'auditoria'
                 ? 'bg-purple-600 text-white shadow'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
@@ -243,7 +293,7 @@ export const AdminPanel: React.FC = () => {
 
           <button
             onClick={() => setActiveAdminTab('datos')}
-            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
               activeAdminTab === 'datos'
                 ? 'bg-purple-600 text-white shadow'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
@@ -254,6 +304,18 @@ export const AdminPanel: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* TAB: IMPORTAR PERSONAS (EXCEL MAESTRO)                                     */}
+      {/* ========================================================================= */}
+      {activeAdminTab === 'importar_personas' && (
+        <ExcelImportSection onSuccess={() => setActiveAdminTab('personas')} />
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: REGISTRAR PUNTOS                                                     */}
+      {/* ========================================================================= */}
+      {activeAdminTab === 'registrar_puntos' && <ManualPointsSection />}
 
       {/* ========================================================================= */}
       {/* TAB: EVENTOS & TURNOS QR                                                  */}
@@ -674,116 +736,224 @@ export const AdminPanel: React.FC = () => {
       {/* TAB: INTEGRANTES (PERSONAS)                                               */}
       {/* ========================================================================= */}
       {activeAdminTab === 'personas' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Users className="w-5 h-5 text-indigo-400" />
-                Administración de Integrantes ({personas.length})
-              </h3>
-              <p className="text-xs text-slate-400">
-                Cambio de GT, altas, bajas y activación
-              </p>
-            </div>
+        <div className="space-y-6">
+          {/* Card: Formulario + Agregar Persona */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Plus className="w-5 h-5 text-indigo-400" />
+                  + Agregar Persona Manualmente
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Registra individualmente a un miembro y asígnalo a su Grupo de Trabajo (GT).
+                </p>
+              </div>
 
-            {/* Quick add person form */}
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Nombre completo..."
-                value={newPersonaNombre}
-                onChange={(e) => setNewPersonaNombre(e.target.value)}
-                className="bg-slate-800 text-xs text-white px-3 py-2 rounded-xl border border-slate-700"
-              />
-              <select
-                value={newPersonaGtId}
-                onChange={(e) => setNewPersonaGtId(e.target.value)}
-                className="bg-slate-800 text-xs text-slate-200 px-2.5 py-2 rounded-xl border border-slate-700"
-              >
-                {gts.map((gt) => (
-                  <option key={gt.id} value={gt.id}>
-                    {gt.nombre}
-                  </option>
-                ))}
-              </select>
               <button
-                onClick={() => {
-                  if (newPersonaNombre.trim()) {
-                    crearPersona({
-                      nombreCompleto: newPersonaNombre.trim(),
-                      gtId: newPersonaGtId,
-                      activo: true,
-                    });
-                    setNewPersonaNombre('');
-                    showFeedback('Integrante creado.');
-                  }
-                }}
-                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shrink-0"
+                type="button"
+                onClick={() => setActiveAdminTab('importar_personas')}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-emerald-400 border border-emerald-500/30 shrink-0 cursor-pointer"
               >
-                <Plus className="w-4 h-4" />
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>¿Tienes muchas? Cargar desde Excel</span>
               </button>
             </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (newPersonaNombre.trim()) {
+                  crearPersona({
+                    nombreCompleto: newPersonaNombre.trim(),
+                    gtId: newPersonaGtId || gts[0]?.id || '',
+                    activo: true,
+                  });
+                  setNewPersonaNombre('');
+                  showFeedback(`¡Persona "${newPersonaNombre.trim()}" agregada con éxito!`);
+                }
+              }}
+              className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-end bg-slate-800/40 p-4 rounded-2xl border border-slate-700/60"
+            >
+              {/* Campo NOMBRE */}
+              <div className="sm:col-span-6 space-y-1.5">
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                  NOMBRE:
+                </label>
+                <input
+                  id="input-nombre-persona"
+                  type="text"
+                  placeholder="Ej. Juan Pérez, Valentina Gómez..."
+                  value={newPersonaNombre}
+                  onChange={(e) => setNewPersonaNombre(e.target.value)}
+                  className="w-full bg-slate-900 text-xs sm:text-sm text-white px-3.5 py-2.5 rounded-xl border border-slate-700 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  required
+                />
+              </div>
+
+              {/* Selector GT */}
+              <div className="sm:col-span-4 space-y-1.5">
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
+                  GT (Grupo de Trabajo):
+                </label>
+                <select
+                  id="select-gt-persona"
+                  value={newPersonaGtId || gts[0]?.id}
+                  onChange={(e) => setNewPersonaGtId(e.target.value)}
+                  className="w-full bg-slate-900 text-xs sm:text-sm text-slate-200 px-3 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  {gts.map((gt) => (
+                    <option key={gt.id} value={gt.id}>
+                      {gt.nombre} ({gt.codigo})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Botón GUARDAR PERSONA */}
+              <div className="sm:col-span-2">
+                <button
+                  id="btn-guardar-persona"
+                  type="submit"
+                  disabled={!newPersonaNombre.trim()}
+                  className="w-full py-2.5 px-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>GUARDAR PERSONA</span>
+                </button>
+              </div>
+            </form>
           </div>
 
-          <div className="max-h-96 overflow-y-auto divide-y divide-slate-800">
-            {personas.map((p) => {
-              const gt = gts.find((g) => g.id === p.gtId);
+          {/* Listado y Administración de Integrantes */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Users className="w-4 h-4 text-indigo-400" />
+                  Integrantes Registrados ({personas.length})
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Edita el GT asignado o activa/desactiva participantes
+                </p>
+              </div>
 
-              return (
-                <div
-                  key={p.id}
-                  className="py-3 flex items-center justify-between gap-3 text-xs"
-                >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`w-2 h-2 rounded-full ${
-                        p.activo ? 'bg-emerald-400' : 'bg-red-400'
-                      }`}
-                    />
-                    <span className="font-semibold text-white">
-                      {p.nombreCompleto}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {/* GT Switcher */}
-                    <select
-                      value={p.gtId}
-                      onChange={(e) => cambiarGtPersona(p.id, e.target.value)}
-                      className="bg-slate-800 text-xs text-slate-300 border border-slate-700 rounded-lg px-2 py-1"
-                    >
-                      {gts.map((gtItem) => (
-                        <option key={gtItem.id} value={gtItem.id}>
-                          {gtItem.nombre}
-                        </option>
-                      ))}
-                    </select>
-
-                    <button
-                      onClick={() => togglePersonaActiva(p.id)}
-                      className={`px-2 py-1 rounded text-[10px] font-bold ${
-                        p.activo
-                          ? 'bg-emerald-500/20 text-emerald-300'
-                          : 'bg-red-500/20 text-red-300'
-                      }`}
-                    >
-                      {p.activo ? 'Activo' : 'Inactivo'}
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        if (window.confirm(`¿Eliminar a ${p.nombreCompleto}?`)) {
-                          eliminarPersona(p.id);
-                        }
-                      }}
-                      className="p-1 text-slate-500 hover:text-red-400"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+              {personas.length > 0 && (
+                <div className="w-full sm:w-64">
+                  <input
+                    type="text"
+                    placeholder="Buscar por nombre o GT..."
+                    value={personaFilterText}
+                    onChange={(e) => setPersonaFilterText(e.target.value)}
+                    className="w-full bg-slate-800 text-xs text-white px-3 py-2 rounded-xl border border-slate-700 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
                 </div>
-              );
-            })}
+              )}
+            </div>
+
+            {/* Empty state if personas is 0 */}
+            {personas.length === 0 ? (
+              <div className="py-12 text-center border border-dashed border-slate-800 rounded-2xl bg-slate-900/40 space-y-3">
+                <Users className="w-10 h-10 text-slate-600 mx-auto" />
+                <div>
+                  <p className="text-sm font-bold text-slate-300">
+                    No hay personas registradas todavía.
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                    Los datos de prueba han sido limpiados. Agrega integrantes con el formulario superior o importa el archivo Excel.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveAdminTab('importar_personas')}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-600/20 cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>Importar Personas desde Excel</span>
+                </button>
+              </div>
+            ) : (
+              <div className="max-h-96 overflow-y-auto divide-y divide-slate-800">
+                {personas
+                  .filter((p) => {
+                    if (!personaFilterText) return true;
+                    const q = personaFilterText.toLowerCase();
+                    const gt = gts.find((g) => g.id === p.gtId);
+                    return (
+                      p.nombreCompleto.toLowerCase().includes(q) ||
+                      gt?.nombre.toLowerCase().includes(q) ||
+                      gt?.codigo.toLowerCase().includes(q)
+                    );
+                  })
+                  .map((p) => {
+                    const gt = gts.find((g) => g.id === p.gtId);
+
+                    return (
+                      <div
+                        key={p.id}
+                        className="py-3 flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span
+                            className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                              p.activo ? 'bg-emerald-400' : 'bg-red-400'
+                            }`}
+                          />
+                          <div>
+                            <span className="font-semibold text-white block">
+                              {p.nombreCompleto}
+                            </span>
+                            <span className="text-[11px] text-slate-400">
+                              GT actual: <strong className="text-slate-200">{gt?.nombre || 'Sin GT'}</strong>
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {/* GT Switcher */}
+                          <select
+                            value={p.gtId}
+                            onChange={(e) => {
+                              cambiarGtPersona(p.id, e.target.value);
+                              showFeedback(`GT actualizado para ${p.nombreCompleto}.`);
+                            }}
+                            className="bg-slate-800 text-xs text-slate-300 border border-slate-700 rounded-lg px-2 py-1"
+                          >
+                            {gts.map((gtItem) => (
+                              <option key={gtItem.id} value={gtItem.id}>
+                                {gtItem.nombre}
+                              </option>
+                            ))}
+                          </select>
+
+                          <button
+                            onClick={() => togglePersonaActiva(p.id)}
+                            className={`px-2 py-1 rounded text-[10px] font-bold cursor-pointer ${
+                              p.activo
+                                ? 'bg-emerald-500/20 text-emerald-300'
+                                : 'bg-red-500/20 text-red-300'
+                            }`}
+                          >
+                            {p.activo ? 'Activo' : 'Inactivo'}
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`¿Eliminar a ${p.nombreCompleto}?`)) {
+                                eliminarPersona(p.id);
+                                showFeedback(`Persona eliminada.`);
+                              }
+                            }}
+                            className="p-1.5 text-slate-500 hover:text-red-400 rounded-lg hover:bg-rose-950/30 transition-colors cursor-pointer"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -930,13 +1100,17 @@ export const AdminPanel: React.FC = () => {
               </span>
             </div>
             <button
-              onClick={() => {
-                if (window.confirm('¿Seguro que deseas limpiar las personas y asistencias de prueba?')) {
-                  limpiarTodosLosDatos();
-                  showFeedback('Datos de prueba eliminados. Sistema limpio para producción.');
+              onClick={async () => {
+                if (
+                  window.confirm(
+                    '¿Seguro que deseas limpiar las personas y asistencias de prueba?\n\nLos GTs, eventos, temporadas y factores de tamaño permanecerán intactos.'
+                  )
+                ) {
+                  await limpiarDatosPrueba();
+                  showFeedback('¡Datos de prueba eliminados! Sistema listo con personas y puntos en 0.');
                 }
               }}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shrink-0"
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shrink-0 cursor-pointer"
             >
               Limpiar Datos de Prueba
             </button>

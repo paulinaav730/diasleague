@@ -156,11 +156,21 @@ export const IndividualRanking: React.FC<IndividualRankingProps> = ({
         })}
       </div>
 
-      {filtered.length === 0 && (
+      {ranking.length === 0 ? (
+        <div className="py-14 text-center border border-dashed border-slate-800 rounded-2xl bg-slate-900/40">
+          <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center mx-auto mb-3 text-slate-400">
+            <Award className="w-6 h-6 opacity-60" />
+          </div>
+          <p className="text-base font-bold text-slate-300">No hay personas registradas todavía.</p>
+          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            Puedes importar la lista oficial en Excel o agregar participantes manualmente desde el Panel de Administración.
+          </p>
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="py-12 text-center text-slate-500 text-sm">
           No se encontraron integrantes con los filtros seleccionados.
         </div>
-      )}
+      ) : null}
     </div>
   );
 };

@@ -11,7 +11,8 @@ import { AnalyticsView } from './components/AnalyticsView';
 import { AdminPanel } from './components/AdminPanel';
 import { GtProfileModal } from './components/GtProfileModal';
 import { PersonaProfileModal } from './components/PersonaProfileModal';
-import { Sparkles, Trophy, QrCode, Shield, CheckCircle2 } from 'lucide-react';
+import { ConectadoDetalleModal } from './components/ConectadoDetalleModal';
+import { Sparkles, Trophy, QrCode, Shield, CheckCircle2, Calendar, Award } from 'lucide-react';
 
 function AppContent() {
   const {
@@ -22,11 +23,14 @@ function AppContent() {
     rankingPersonas,
     temporadaActiva,
     eventos,
+    retos,
+    asistencias,
   } = useApp();
 
   // Modal inspection states
   const [selectedGtId, setSelectedGtId] = useState<string | null>(null);
   const [selectedPersonaId, setSelectedPersonaId] = useState<string | null>(null);
+  const [selectedConectadoId, setSelectedConectadoId] = useState<string | null>(null);
 
   // Preselected event/shift for QR registration flow
   const [targetEventoId, setTargetEventoId] = useState<string | undefined>();
@@ -85,6 +89,89 @@ function AppContent() {
               podio={podio}
               onSelectGt={(gtId) => setSelectedGtId(gtId)}
             />
+
+            {/* Showcase: Calificación y Retos por Conectado */}
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs uppercase font-extrabold tracking-wider text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 rounded-full">
+                      Jornadas Competitivas
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      Asistencia por tamaño de GT + Retos acumulados
+                    </span>
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-black text-white mt-1 flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-amber-400" />
+                    Calificación y Retos por Conectado
+                  </h3>
+                </div>
+
+                <button
+                  onClick={() => setActiveTab('eventos')}
+                  className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 shrink-0"
+                >
+                  Ver todos en Eventos ➔
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-1">
+                {eventos.map((ev) => {
+                  const evAsist = asistencias.filter(
+                    (a) => a.eventoId === ev.id && !a.anulado
+                  ).length;
+                  const evRetos = retos.filter((r) => r.eventoId === ev.id).length;
+
+                  return (
+                    <div
+                      key={ev.id}
+                      onClick={() => setSelectedConectadoId(ev.id)}
+                      className="p-4 rounded-2xl bg-slate-850/80 border border-slate-800 hover:border-amber-500/50 hover:bg-slate-800/90 transition-all cursor-pointer group flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span
+                            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                              ev.estado === 'activo'
+                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                : ev.estado === 'finalizado'
+                                ? 'bg-slate-800 text-slate-400 border-slate-700'
+                                : 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
+                            }`}
+                          >
+                            {ev.estado}
+                          </span>
+                          <span className="text-xs font-black text-amber-300">
+                            +{ev.puntosAsistencia} pts base
+                          </span>
+                        </div>
+
+                        <h4 className="text-base font-extrabold text-white group-hover:text-amber-300 transition-colors">
+                          {ev.nombre}
+                        </h4>
+
+                        <div className="mt-2 text-xs text-slate-400 space-y-1">
+                          <div className="flex justify-between">
+                            <span>Asistentes registrados:</span>
+                            <span className="font-bold text-white">{evAsist}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Retos en este Conectado:</span>
+                            <span className="font-bold text-purple-400">{evRetos}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-bold text-amber-400 group-hover:translate-x-0.5 transition-transform">
+                        <span>Ver Resultado y Retos</span>
+                        <span>➔</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
 
             {/* General GT Leaderboard Table */}
             <GtRankingTable
@@ -183,6 +270,16 @@ function AppContent() {
           personaId={selectedPersonaId}
           onClose={() => setSelectedPersonaId(null)}
           onSelectGt={(gtId) => setSelectedGtId(gtId)}
+        />
+      )}
+
+      {/* Global Conectado Inspection Modal */}
+      {selectedConectadoId && (
+        <ConectadoDetalleModal
+          eventoId={selectedConectadoId}
+          onClose={() => setSelectedConectadoId(null)}
+          onOpenQrProjector={handleOpenQrProjectorForEvent}
+          onOpenRegister={handleOpenRegisterForEvent}
         />
       )}
 

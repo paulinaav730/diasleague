@@ -17,6 +17,8 @@ export const GtRankingTable: React.FC<GtRankingTableProps> = ({ ranking, onSelec
       item.gt.codigo.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const totalPuntos = ranking.reduce((acc, item) => acc + item.diasPointsFinal, 0);
+
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl">
       {/* Header */}
@@ -84,6 +86,19 @@ export const GtRankingTable: React.FC<GtRankingTableProps> = ({ ranking, onSelec
         </div>
       )}
 
+      {/* Zero points notification banner */}
+      {totalPuntos === 0 && (
+        <div className="mb-5 p-3.5 bg-slate-800/60 border border-slate-700/60 rounded-2xl flex items-center justify-between gap-3 text-xs text-slate-400">
+          <div className="flex items-center gap-2.5">
+            <Trophy className="w-4 h-4 text-amber-400/80 shrink-0" />
+            <span className="font-semibold text-slate-200">El ranking todavía no tiene puntos.</span>
+          </div>
+          <span className="text-[11px] text-slate-500 hidden sm:inline">
+            Todos los GTs inician en 0 puntos a la espera del registro de participaciones reales.
+          </span>
+        </div>
+      )}
+
       {/* Table container */}
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm text-slate-300">
@@ -100,9 +115,10 @@ export const GtRankingTable: React.FC<GtRankingTableProps> = ({ ranking, onSelec
           </thead>
           <tbody className="divide-y divide-slate-800/60">
             {filteredRanking.map((item) => {
-              const isFirst = item.posicion === 1;
-              const isSecond = item.posicion === 2;
-              const isThird = item.posicion === 3;
+              const hasPoints = item.diasPointsFinal > 0;
+              const isFirst = hasPoints && item.posicion === 1;
+              const isSecond = hasPoints && item.posicion === 2;
+              const isThird = hasPoints && item.posicion === 3;
 
               return (
                 <tr
@@ -131,8 +147,8 @@ export const GtRankingTable: React.FC<GtRankingTableProps> = ({ ranking, onSelec
                         </span>
                       )}
                       {!isFirst && !isSecond && !isThird && (
-                        <span className="w-7 h-7 rounded-lg bg-slate-800 text-slate-400 flex items-center justify-center text-xs border border-slate-700">
-                          #{item.posicion}
+                        <span className="w-7 h-7 rounded-lg bg-slate-800 text-slate-400 flex items-center justify-center text-xs border border-slate-700 font-medium">
+                          {hasPoints ? `#${item.posicion}` : '-'}
                         </span>
                       )}
                     </div>

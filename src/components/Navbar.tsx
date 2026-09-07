@@ -168,39 +168,15 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab: propActiveTab, setAct
             <button
               id="btn-nav-admin"
               onClick={() => setActiveTab('admin')}
-              className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
                 activeTab === 'admin'
                   ? 'bg-purple-600 text-white ring-2 ring-purple-400/50'
-                  : 'bg-slate-800 text-purple-300 hover:bg-slate-700 border border-purple-500/30'
+                  : 'bg-purple-950/70 text-purple-200 hover:bg-purple-900 border border-purple-500/40'
               }`}
               title="Panel Administrativo DIAS"
             >
-              <Shield className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Admin</span>
-            </button>
-
-            {/* Admin Toggle switch */}
-            <button
-              id="btn-toggle-admin-role"
-              onClick={() => setIsAdmin(!isAdmin)}
-              className={`px-2 py-1 rounded text-[10px] font-bold uppercase transition-all ${
-                isAdmin
-                  ? 'bg-purple-900/60 text-purple-200 border border-purple-500/40'
-                  : 'bg-slate-800 text-slate-400 border border-slate-700'
-              }`}
-              title="Alternar entre rol Administrador y Participante"
-            >
-              {isAdmin ? (
-                <span className="flex items-center gap-1 text-purple-300">
-                  <ShieldAlert className="w-3 h-3" />
-                  Admin
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-slate-400">
-                  <Users className="w-3 h-3" />
-                  User
-                </span>
-              )}
+              <Shield className="w-3.5 h-3.5 text-purple-300" />
+              <span>Admin DIAS</span>
             </button>
           </div>
         </div>

@@ -148,3 +148,25 @@ export interface PersonaCalculada {
   totalEventos: number;
   posicion: number;
 }
+
+export interface RetoDetalleConectado {
+  retoId: string;
+  retoNombre: string;
+  puntos: number;
+  posicion?: number;
+  personaNombre?: string;
+}
+
+export interface ResultadoConectadoGt {
+  gt: GrupoTrabajo;
+  totalIntegrantes: number;
+  asistentes: number;
+  porcentajeAsistencia: number;
+  factorTamano: number;
+  puntosAsistenciaBrutos: number;
+  puntosAsistenciaAjustados: number;
+  puntosRetos: number;
+  retosGanados: RetoDetalleConectado[];
+  resultadoGeneral: number;
+  posicion: number;
+}
