@@ -1224,7 +1224,7 @@ export const AdminPanel: React.FC = () => {
                     {gt.codigo}
                   </div>
                   <div>
-                    <span className="font-bold text-white text-sm block">
+                    <span className="font-bold text-white text-sm block uppercase tracking-wide">
                       {gt.nombre}
                     </span>
                     <span className="text-[11px] text-slate-400">

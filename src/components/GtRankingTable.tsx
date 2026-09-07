@@ -164,7 +164,7 @@ export const GtRankingTable: React.FC<GtRankingTableProps> = ({ ranking, onSelec
                         {item.gt.codigo}
                       </div>
                       <div>
-                        <span className="font-bold text-white group-hover:text-amber-300 transition-colors block">
+                        <span className="font-bold text-white group-hover:text-amber-300 transition-colors block uppercase tracking-wide">
                           {item.gt.nombre}
                         </span>
                         <span className="text-[11px] text-slate-400">

@@ -32,14 +32,14 @@ export function descargarPlantillaExcelMaestro(gts: GrupoTrabajo[]) {
     ? gts
     : [
         { nombre: 'GH', codigo: 'GH' },
-        { nombre: 'Logística', codigo: 'LOG' },
+        { nombre: 'LOGÍSTICA', codigo: 'LOG' },
         { nombre: 'RRPP', codigo: 'RRPP' },
-        { nombre: 'Publicidad', codigo: 'PUB' },
-        { nombre: 'Generales', codigo: 'GEN' },
-        { nombre: 'The Games', codigo: 'TG' },
-        { nombre: 'Carnival', codigo: 'CARN' },
-        { nombre: 'Finanzas', codigo: 'FIN' },
-        { nombre: 'Seguridad', codigo: 'SEG' },
+        { nombre: 'MERCADEO', codigo: 'MER' },
+        { nombre: 'GENERALES', codigo: 'GEN' },
+        { nombre: 'THE GAMES', codigo: 'TG' },
+        { nombre: 'CARNIVAL', codigo: 'CARN' },
+        { nombre: 'FINANZAS', codigo: 'FIN' },
+        { nombre: 'SEGURIDAD', codigo: 'SEG' },
       ];
 
   const gtsData = [
@@ -137,6 +137,18 @@ export async function validarYParsearExcel(
     gtsDisponibles.forEach((gt) => {
       gtLookup.set(normalizeString(gt.nombre), gt);
       gtLookup.set(normalizeString(gt.codigo), gt);
+      // If this is MERCADEO, also map aliases like mecadeo, publicidad, pub
+      if (
+        normalizeString(gt.nombre).includes('mercadeo') ||
+        normalizeString(gt.codigo) === 'mer' ||
+        gt.id === 'gt-mercadeo' ||
+        gt.id === 'gt-publicidad'
+      ) {
+        gtLookup.set('mecadeo', gt);
+        gtLookup.set('mercadeo', gt);
+        gtLookup.set('publicidad', gt);
+        gtLookup.set('pub', gt);
+      }
     });
 
     const personasParsed: PersonaImportada[] = [];

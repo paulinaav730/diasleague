@@ -10,7 +10,7 @@ export interface Temporada {
 
 export interface GrupoTrabajo {
   id: string;
-  nombre: string; // e.g. "GH", "Logística", "RRPP", "Publicidad", "Generales", "The Games", "Carnival", "Finanzas", "Seguridad"
+  nombre: string; // e.g. "GH", "LOGÍSTICA", "RRPP", "MERCADEO", "GENERALES", "THE GAMES", "CARNIVAL", "FINANZAS", "SEGURIDAD"
   codigo: string;
   descripcion?: string;
   color: string;

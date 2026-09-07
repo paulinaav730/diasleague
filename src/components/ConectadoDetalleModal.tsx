@@ -371,7 +371,7 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
                         </div>
 
                         <div>
-                          <h4 className="font-extrabold text-white text-base">
+                          <h4 className="font-extrabold text-white text-base uppercase tracking-wide">
                             {gtRes.gtNombre}
                           </h4>
                           <p className="text-xs text-slate-400 mt-0.5">
@@ -450,7 +450,7 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
                                   style={{ backgroundColor: item.color }}
                                 />
                                 <div>
-                                  <span className="font-bold text-white block">
+                                  <span className="font-bold text-white block uppercase tracking-wide">
                                     {item.gtNombre}
                                   </span>
                                   {item.retosGanados.length > 0 && (

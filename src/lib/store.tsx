@@ -194,12 +194,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [gts, setGts] = useState<GrupoTrabajo[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY + '_gts');
-    return saved ? JSON.parse(saved) : INITIAL_GTS;
+    const rawList: GrupoTrabajo[] = saved ? JSON.parse(saved) : INITIAL_GTS;
+    return rawList.map((g) => {
+      let nombre = (g.nombre || '').toUpperCase();
+      let codigo = (g.codigo || '').toUpperCase();
+      let id = g.id;
+      let descripcion = g.descripcion;
+      if (nombre.includes('PUBLICIDAD') || g.id === 'gt-publicidad') {
+        nombre = 'MERCADEO';
+        codigo = 'MER';
+        id = 'gt-mercadeo';
+        descripcion = 'Mercadeo, Redes, Diseño y Contenido Audiovisual';
+      }
+      return {
+        ...g,
+        id,
+        nombre,
+        codigo,
+        descripcion,
+      };
+    });
   });
 
   const [personas, setPersonas] = useState<Persona[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY + '_personas');
-    return saved ? JSON.parse(saved) : INITIAL_PERSONAS;
+    const list: Persona[] = saved ? JSON.parse(saved) : INITIAL_PERSONAS;
+    return list.map((p) => (p.gtId === 'gt-publicidad' ? { ...p, gtId: 'gt-mercadeo' } : p));
   });
 
   const [eventos, setEventos] = useState<Evento[]>(() => {
@@ -214,7 +234,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [asistencias, setAsistencias] = useState<Asistencia[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY + '_asistencias');
-    return saved ? JSON.parse(saved) : INITIAL_ASISTENCIAS;
+    const list: Asistencia[] = saved ? JSON.parse(saved) : INITIAL_ASISTENCIAS;
+    return list.map((a) => (a.gtId === 'gt-publicidad' ? { ...a, gtId: 'gt-mercadeo' } : a));
   });
 
   const [retos, setRetos] = useState<Reto[]>(() => {
@@ -224,7 +245,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [participacionesRetos, setParticipacionesRetos] = useState<ParticipacionReto[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY + '_participacionesRetos');
-    return saved ? JSON.parse(saved) : INITIAL_PARTICIPACION_RETOS;
+    const list: ParticipacionReto[] = saved ? JSON.parse(saved) : INITIAL_PARTICIPACION_RETOS;
+    return list.map((pr) => (pr.gtId === 'gt-publicidad' ? { ...pr, gtId: 'gt-mercadeo' } : pr));
   });
 
   const [factores, setFactores] = useState<FactorTamanoRango[]>(() => {
@@ -562,6 +584,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     (gtData: Omit<GrupoTrabajo, 'id' | 'createdAt'>) => {
       const nuevoGt: GrupoTrabajo = {
         ...gtData,
+        nombre: (gtData.nombre || '').trim().toUpperCase(),
+        codigo: (gtData.codigo || '').trim().toUpperCase(),
         id: 'gt-' + Date.now(),
         createdAt: new Date().toISOString(),
       };
@@ -573,8 +597,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const actualizarGt = useCallback(
     (id: string, updates: Partial<GrupoTrabajo>) => {
-      setGts((prev) => prev.map((g) => (g.id === id ? { ...g, ...updates } : g)));
-      addAuditLog('ACTUALIZAR_GT', 'gt', id, `Modificación en GT: ${JSON.stringify(updates)}`);
+      const sanitizedUpdates = {
+        ...updates,
+        ...(updates.nombre ? { nombre: updates.nombre.trim().toUpperCase() } : {}),
+        ...(updates.codigo ? { codigo: updates.codigo.trim().toUpperCase() } : {}),
+      };
+      setGts((prev) => prev.map((g) => (g.id === id ? { ...g, ...sanitizedUpdates } : g)));
+      addAuditLog('ACTUALIZAR_GT', 'gt', id, `Modificación en GT: ${JSON.stringify(sanitizedUpdates)}`);
     },
     [addAuditLog]
   );

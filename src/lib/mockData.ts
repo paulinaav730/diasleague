@@ -47,7 +47,7 @@ export const INITIAL_GTS: GrupoTrabajo[] = [
   },
   {
     id: 'gt-logistica',
-    nombre: 'Logística',
+    nombre: 'LOGÍSTICA',
     codigo: 'LOG',
     descripcion: 'Operaciones, Montajes y Logística de Eventos',
     color: '#10B981', // Emerald
@@ -66,10 +66,10 @@ export const INITIAL_GTS: GrupoTrabajo[] = [
     createdAt: '2026-08-01T00:00:00Z',
   },
   {
-    id: 'gt-publicidad',
-    nombre: 'Publicidad',
-    codigo: 'PUB',
-    descripcion: 'Diseño Gráfico, Contenido y Audiovisuales',
+    id: 'gt-mercadeo',
+    nombre: 'MERCADEO',
+    codigo: 'MER',
+    descripcion: 'Mercadeo, Redes, Diseño y Contenido Audiovisual',
     color: '#EC4899', // Pink
     icono: 'Palette',
     activo: true,
@@ -77,7 +77,7 @@ export const INITIAL_GTS: GrupoTrabajo[] = [
   },
   {
     id: 'gt-generales',
-    nombre: 'Generales',
+    nombre: 'GENERALES',
     codigo: 'GEN',
     descripcion: 'Comité General y Coordinación Interdisciplinaria',
     color: '#F59E0B', // Amber
@@ -87,7 +87,7 @@ export const INITIAL_GTS: GrupoTrabajo[] = [
   },
   {
     id: 'gt-the-games',
-    nombre: 'The Games',
+    nombre: 'THE GAMES',
     codigo: 'TG',
     descripcion: 'Torneos, Recreación y Gaming',
     color: '#06B6D4', // Cyan
@@ -97,7 +97,7 @@ export const INITIAL_GTS: GrupoTrabajo[] = [
   },
   {
     id: 'gt-carnival',
-    nombre: 'Carnival',
+    nombre: 'CARNIVAL',
     codigo: 'CARN',
     descripcion: 'Cultura, Festivales y Experiencias',
     color: '#F97316', // Orange
@@ -107,7 +107,7 @@ export const INITIAL_GTS: GrupoTrabajo[] = [
   },
   {
     id: 'gt-finanzas',
-    nombre: 'Finanzas',
+    nombre: 'FINANZAS',
     codigo: 'FIN',
     descripcion: 'Presupuestos, Compras y Tesorería',
     color: '#14B8A6', // Teal
@@ -117,7 +117,7 @@ export const INITIAL_GTS: GrupoTrabajo[] = [
   },
   {
     id: 'gt-seguridad',
-    nombre: 'Seguridad',
+    nombre: 'SEGURIDAD',
     codigo: 'SEG',
     descripcion: 'Control, Protocolos y Primeros Auxilios',
     color: '#EF4444', // Red

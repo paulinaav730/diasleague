@@ -428,7 +428,7 @@ export const ParticipantRegisterView: React.FC<ParticipantRegisterViewProps> = (
                         {gt.codigo}
                       </div>
                       <div className="min-w-0">
-                        <span className="text-xs font-bold text-white block truncate">
+                        <span className="text-xs font-extrabold text-white block truncate uppercase tracking-wide">
                           {gt.nombre}
                         </span>
                         <span className="text-[10px] text-slate-400 block">
@@ -446,7 +446,7 @@ export const ParticipantRegisterView: React.FC<ParticipantRegisterViewProps> = (
               <div className="p-3 bg-slate-800/80 rounded-xl border border-slate-700 flex items-center justify-between text-xs">
                 <span className="text-slate-300">
                   GT seleccionado:{' '}
-                  <strong className="text-white font-bold">{selectedGt.nombre}</strong>
+                  <strong className="text-white font-black uppercase tracking-wide">{selectedGt.nombre}</strong>
                 </span>
                 <span
                   className="px-2.5 py-0.5 rounded-full text-white text-[11px] font-extrabold"

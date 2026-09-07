@@ -139,7 +139,9 @@ export const ExcelImportSection: React.FC<ExcelImportSectionProps> = ({ onSucces
           </div>
           <div className="p-3 bg-slate-800/60 border border-slate-700/60 rounded-xl">
             <span className="font-bold text-slate-200 block mb-1">2. GTs Válidos ({gts.length})</span>
-            <span className="text-slate-400">GH, Logística, RRPP, Publicidad, Generales, The Games, Carnival, Finanzas, Seguridad</span>
+            <span className="text-slate-400 font-medium">
+              {gts.map((g) => g.nombre.toUpperCase()).join(', ')}
+            </span>
           </div>
           <div className="p-3 bg-slate-800/60 border border-slate-700/60 rounded-xl">
             <span className="font-bold text-slate-200 block mb-1">3. Validación previa</span>

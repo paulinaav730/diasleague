@@ -87,7 +87,7 @@ export const Podium: React.FC<PodiumProps> = ({ podio, onSelectGt }) => {
                   {second.gt.codigo}
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-lg group-hover:text-slate-200">
+                  <h3 className="font-bold text-white text-lg group-hover:text-slate-200 uppercase tracking-wide">
                     {second.gt.nombre}
                   </h3>
                   <span className="text-xs text-slate-400">
@@ -169,7 +169,7 @@ export const Podium: React.FC<PodiumProps> = ({ podio, onSelectGt }) => {
                   {first.gt.codigo}
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-white text-2xl group-hover:text-amber-200 transition-colors">
+                  <h3 className="font-extrabold text-white text-2xl group-hover:text-amber-200 transition-colors uppercase tracking-wide">
                     {first.gt.nombre}
                   </h3>
                   <span className="text-xs text-amber-200/80">
@@ -255,7 +255,7 @@ export const Podium: React.FC<PodiumProps> = ({ podio, onSelectGt }) => {
                   {third.gt.codigo}
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-lg group-hover:text-slate-200">
+                  <h3 className="font-bold text-white text-lg group-hover:text-slate-200 uppercase tracking-wide">
                     {third.gt.nombre}
                   </h3>
                   <span className="text-xs text-slate-400">
