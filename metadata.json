@@ -1,0 +1,6 @@
+{
+  "name": "DIAS LEAGUE",
+  "description": "Sistema de gamificación y competencia interna de la Organización Estudiantil DIAS - Universidad EAFIT",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
