@@ -54,15 +54,201 @@ export function descargarPlantillaExcelMaestro(gts: GrupoTrabajo[]) {
   XLSX.writeFile(wb, 'DIAS_LEAGUE_EXCEL_MAESTRO.xlsx');
 }
 
+export const CANONICAL_GTS: GrupoTrabajo[] = [
+  {
+    id: 'gt-mercadeo',
+    nombre: 'MERCADEO',
+    codigo: 'MER',
+    descripcion: 'Mercadeo, Redes, Diseño y Contenido Audiovisual',
+    color: '#EC4899',
+    icono: 'Palette',
+    activo: true,
+    createdAt: '2026-08-01T00:00:00Z',
+  },
+  {
+    id: 'gt-logistica',
+    nombre: 'LOGÍSTICA',
+    codigo: 'LOG',
+    descripcion: 'Operaciones, Montajes y Logística de Eventos',
+    color: '#10B981',
+    icono: 'Boxes',
+    activo: true,
+    createdAt: '2026-08-01T00:00:00Z',
+  },
+  {
+    id: 'gt-gh',
+    nombre: 'GH',
+    codigo: 'GH',
+    descripcion: 'Gestión Humana y Talento',
+    color: '#3B82F6',
+    icono: 'Users',
+    activo: true,
+    createdAt: '2026-08-01T00:00:00Z',
+  },
+  {
+    id: 'gt-rrpp',
+    nombre: 'RRPP',
+    codigo: 'RRPP',
+    descripcion: 'Relaciones Públicas y Patrocinios',
+    color: '#8B5CF6',
+    icono: 'Megaphone',
+    activo: true,
+    createdAt: '2026-08-01T00:00:00Z',
+  },
+  {
+    id: 'gt-generales',
+    nombre: 'GENERALES',
+    codigo: 'GEN',
+    descripcion: 'Comité General y Coordinación Interdisciplinaria',
+    color: '#F59E0B',
+    icono: 'Compass',
+    activo: true,
+    createdAt: '2026-08-01T00:00:00Z',
+  },
+  {
+    id: 'gt-the-games',
+    nombre: 'THE GAMES',
+    codigo: 'TG',
+    descripcion: 'Torneos, Recreación y Gaming',
+    color: '#06B6D4',
+    icono: 'Gamepad2',
+    activo: true,
+    createdAt: '2026-08-01T00:00:00Z',
+  },
+  {
+    id: 'gt-carnival',
+    nombre: 'CARNIVAL',
+    codigo: 'CARN',
+    descripcion: 'Cultura, Festivales y Experiencias',
+    color: '#F97316',
+    icono: 'Sparkles',
+    activo: true,
+    createdAt: '2026-08-01T00:00:00Z',
+  },
+  {
+    id: 'gt-finanzas',
+    nombre: 'FINANZAS',
+    codigo: 'FIN',
+    descripcion: 'Presupuestos, Compras y Tesorería',
+    color: '#14B8A6',
+    icono: 'BadgeDollarSign',
+    activo: true,
+    createdAt: '2026-08-01T00:00:00Z',
+  },
+  {
+    id: 'gt-seguridad',
+    nombre: 'SEGURIDAD',
+    codigo: 'SEG',
+    descripcion: 'Control, Protocolos y Primeros Auxilios',
+    color: '#EF4444',
+    icono: 'ShieldCheck',
+    activo: true,
+    createdAt: '2026-08-01T00:00:00Z',
+  },
+];
+
 /**
- * Normalizes text for lenient matching (removes accents, trims, lowercases)
+ * Normalizes text for lenient matching (removes accents, trims, lowercases, removes punctuation & spaces)
  */
-function normalizeString(str: string): string {
-  return (str || '')
+export function normalizeCleanText(str: any): string {
+  if (str == null) return '';
+  return String(str)
     .trim()
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+/**
+ * Resolves any GT reference from text (MERCADEO, MECADEO, Publicidad, MER, LOG, etc.)
+ */
+export function resolverGtDesdeTexto(rawGt: any, gtsDisponibles: GrupoTrabajo[] = []): GrupoTrabajo | null {
+  const clean = normalizeCleanText(rawGt);
+  if (!clean) return null;
+
+  // Build merged pool of available GTs and canonical ones
+  const pool = [...gtsDisponibles];
+  for (const c of CANONICAL_GTS) {
+    if (!pool.some((g) => g.id === c.id || normalizeCleanText(g.nombre) === normalizeCleanText(c.nombre))) {
+      pool.push(c);
+    }
+  }
+
+  // Find Mercadeo reference in pool
+  const mercadeoGt =
+    pool.find((g) => g.id === 'gt-mercadeo' || normalizeCleanText(g.nombre).includes('mercadeo')) ||
+    pool.find((g) => g.id === 'gt-publicidad' || normalizeCleanText(g.nombre).includes('publicidad')) ||
+    CANONICAL_GTS[0];
+
+  // 1. Direct check against Mercadeo aliases and variants
+  if (
+    clean === 'mercadeo' ||
+    clean === 'mecadeo' ||
+    clean === 'mer' ||
+    clean === 'mkt' ||
+    clean === 'marketing' ||
+    clean === 'publicidad' ||
+    clean === 'pub' ||
+    clean.includes('mercadeo') ||
+    clean.includes('mecadeo') ||
+    clean.includes('publicidad') ||
+    clean.includes('marketing') ||
+    clean === 'gtmercadeo' ||
+    clean === 'gtmecadeo' ||
+    clean === 'gtpublicidad'
+  ) {
+    return {
+      ...mercadeoGt,
+      nombre: 'MERCADEO',
+      codigo: 'MER',
+      id: mercadeoGt.id === 'gt-publicidad' ? 'gt-mercadeo' : mercadeoGt.id,
+    };
+  }
+
+  // 2. Direct exact check on names and codes
+  for (const gt of pool) {
+    const normNom = normalizeCleanText(gt.nombre);
+    const normCod = normalizeCleanText(gt.codigo);
+    if (clean === normNom || clean === normCod || clean === normalizeCleanText(gt.id)) {
+      return gt.id === 'gt-publicidad' ? { ...gt, id: 'gt-mercadeo', nombre: 'MERCADEO', codigo: 'MER' } : gt;
+    }
+  }
+
+  // 3. Smart pattern matching for other GTs
+  if (clean.includes('logistica') || clean === 'log' || clean.includes('operaciones')) {
+    return pool.find((g) => g.id === 'gt-logistica' || normalizeCleanText(g.nombre).includes('logistica')) || CANONICAL_GTS[1];
+  }
+
+  if (clean === 'gh' || clean.includes('gestionhumana') || clean.includes('gestion') || clean.includes('humana') || clean.includes('talento')) {
+    return pool.find((g) => g.id === 'gt-gh' || normalizeCleanText(g.nombre) === 'gh') || CANONICAL_GTS[2];
+  }
+
+  if (clean === 'rrpp' || clean.includes('relacionespublicas') || clean.includes('relaciones') || clean.includes('patrocinio')) {
+    return pool.find((g) => g.id === 'gt-rrpp' || normalizeCleanText(g.nombre) === 'rrpp') || CANONICAL_GTS[3];
+  }
+
+  if (clean.includes('generales') || clean === 'gen' || clean.includes('general') || clean.includes('coordinacion')) {
+    return pool.find((g) => g.id === 'gt-generales' || normalizeCleanText(g.nombre).includes('generales')) || CANONICAL_GTS[4];
+  }
+
+  if (clean.includes('thegames') || clean.includes('games') || clean === 'tg' || clean.includes('juegos') || clean.includes('gaming')) {
+    return pool.find((g) => g.id === 'gt-the-games' || normalizeCleanText(g.nombre).includes('thegames')) || CANONICAL_GTS[5];
+  }
+
+  if (clean.includes('carnival') || clean.includes('carnaval') || clean === 'carn' || clean.includes('cultura')) {
+    return pool.find((g) => g.id === 'gt-carnival' || normalizeCleanText(g.nombre).includes('carnival')) || CANONICAL_GTS[6];
+  }
+
+  if (clean.includes('finanzas') || clean === 'fin' || clean.includes('tesoreria') || clean.includes('presupuesto')) {
+    return pool.find((g) => g.id === 'gt-finanzas' || normalizeCleanText(g.nombre).includes('finanzas')) || CANONICAL_GTS[7];
+  }
+
+  if (clean.includes('seguridad') || clean === 'seg' || clean.includes('protocolo') || clean.includes('auxilio')) {
+    return pool.find((g) => g.id === 'gt-seguridad' || normalizeCleanText(g.nombre).includes('seguridad')) || CANONICAL_GTS[8];
+  }
+
+  return null;
 }
 
 /**
@@ -70,7 +256,7 @@ function normalizeString(str: string): string {
  */
 export async function validarYParsearExcel(
   file: File,
-  gtsDisponibles: GrupoTrabajo[],
+  gtsDisponibles: GrupoTrabajo[] = [],
   personasExistentes: Persona[] = []
 ): Promise<ExcelValidationResult> {
   const errors: string[] = [];
@@ -104,14 +290,41 @@ export async function validarYParsearExcel(
       };
     }
 
-    // 1. Identify headers in first row
+    // Identify headers in first row (flexible match)
     const headerRow = (rawData[0] || []).map((h) => String(h || '').trim());
-    const colNombreIdx = headerRow.findIndex(
-      (h) => normalizeString(h) === 'nombre' || normalizeString(h) === 'nombres'
-    );
-    const colGtIdx = headerRow.findIndex(
-      (h) => normalizeString(h) === 'gt' || normalizeString(h) === 'grupo' || normalizeString(h) === 'grupodetrabajo'
-    );
+    let colNombreIdx = headerRow.findIndex((h) => {
+      const clean = normalizeCleanText(h);
+      return clean.includes('nombre') || clean.includes('integrante') || clean.includes('persona') || clean.includes('participante');
+    });
+
+    let colGtIdx = headerRow.findIndex((h) => {
+      const clean = normalizeCleanText(h);
+      return clean === 'gt' || clean.includes('grupo') || clean.includes('comite') || clean.includes('equipo');
+    });
+
+    let startRow = 1;
+
+    // Fallback: If no clear headers found, but row 0 looks like data with 2 columns:
+    if (colNombreIdx === -1 || colGtIdx === -1) {
+      if (headerRow.length >= 2) {
+        const potentialGtCol0 = resolverGtDesdeTexto(headerRow[0], gtsDisponibles);
+        const potentialGtCol1 = resolverGtDesdeTexto(headerRow[1], gtsDisponibles);
+
+        if (potentialGtCol1) {
+          colNombreIdx = 0;
+          colGtIdx = 1;
+          startRow = 0; // The first row was actually data
+        } else if (potentialGtCol0) {
+          colNombreIdx = 1;
+          colGtIdx = 0;
+          startRow = 0;
+        } else {
+          // Default fallback to Col 0 = Nombre, Col 1 = GT
+          if (colNombreIdx === -1) colNombreIdx = 0;
+          if (colGtIdx === -1) colGtIdx = 1;
+        }
+      }
+    }
 
     // Rule 1: Que exista la columna NOMBRE
     if (colNombreIdx === -1) {
@@ -132,25 +345,6 @@ export async function validarYParsearExcel(
       };
     }
 
-    // Prepare GT lookup map
-    const gtLookup = new Map<string, GrupoTrabajo>();
-    gtsDisponibles.forEach((gt) => {
-      gtLookup.set(normalizeString(gt.nombre), gt);
-      gtLookup.set(normalizeString(gt.codigo), gt);
-      // If this is MERCADEO, also map aliases like mecadeo, publicidad, pub
-      if (
-        normalizeString(gt.nombre).includes('mercadeo') ||
-        normalizeString(gt.codigo) === 'mer' ||
-        gt.id === 'gt-mercadeo' ||
-        gt.id === 'gt-publicidad'
-      ) {
-        gtLookup.set('mecadeo', gt);
-        gtLookup.set('mercadeo', gt);
-        gtLookup.set('publicidad', gt);
-        gtLookup.set('pub', gt);
-      }
-    });
-
     const personasParsed: PersonaImportada[] = [];
     const seenNamesInFile = new Set<string>();
     let hasMissingName = false;
@@ -159,18 +353,18 @@ export async function validarYParsearExcel(
     const invalidGtsSet = new Set<string>();
 
     const existingNamesSet = new Set<string>(
-      personasExistentes.map((p) => normalizeString(p.nombreCompleto))
+      personasExistentes.map((p) => normalizeCleanText(p.nombreCompleto))
     );
 
-    // Iterate data rows (starting at row 1, 0-indexed)
-    for (let r = 1; r < rawData.length; r++) {
+    // Iterate data rows
+    for (let r = startRow; r < rawData.length; r++) {
       const row = rawData[r];
       if (!row || row.length === 0) continue;
 
       const rawNombre = row[colNombreIdx] != null ? String(row[colNombreIdx]).trim() : '';
       const rawGt = row[colGtIdx] != null ? String(row[colGtIdx]).trim() : '';
 
-      // Ignore empty trailing rows
+      // Ignore completely empty trailing rows
       if (!rawNombre && !rawGt) {
         continue;
       }
@@ -185,19 +379,18 @@ export async function validarYParsearExcel(
         hasMissingGt = true;
       }
 
-      // If either is missing, we record the error and continue
       if (!rawNombre || !rawGt) {
         continue;
       }
 
-      // Rule 5: Que el GT exista en la base de datos
-      const matchedGt = gtLookup.get(normalizeString(rawGt));
+      // Rule 5: Que el GT exista en la base de datos (con resolución flexible)
+      const matchedGt = resolverGtDesdeTexto(rawGt, gtsDisponibles);
       if (!matchedGt) {
         invalidGtsSet.add(rawGt);
       }
 
       // Rule 6: Que no existan personas duplicadas
-      const normName = normalizeString(rawNombre);
+      const normName = normalizeCleanText(rawNombre);
       if (seenNamesInFile.has(normName) || existingNamesSet.has(normName)) {
         hasDuplicates = true;
       } else {
@@ -207,7 +400,7 @@ export async function validarYParsearExcel(
       if (matchedGt) {
         personasParsed.push({
           nombre: rawNombre,
-          gtNombre: matchedGt.nombre,
+          gtNombre: matchedGt.nombre.toUpperCase(),
           gtId: matchedGt.id,
         });
       }
@@ -251,3 +444,4 @@ export async function validarYParsearExcel(
     };
   }
 }
+

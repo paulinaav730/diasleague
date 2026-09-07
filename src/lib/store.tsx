@@ -195,12 +195,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [gts, setGts] = useState<GrupoTrabajo[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY + '_gts');
     const rawList: GrupoTrabajo[] = saved ? JSON.parse(saved) : INITIAL_GTS;
-    return rawList.map((g) => {
-      let nombre = (g.nombre || '').toUpperCase();
-      let codigo = (g.codigo || '').toUpperCase();
+    const mapped: GrupoTrabajo[] = rawList.map((g) => {
+      let nombre = (g.nombre || '').toUpperCase().trim();
+      let codigo = (g.codigo || '').toUpperCase().trim();
       let id = g.id;
       let descripcion = g.descripcion;
-      if (nombre.includes('PUBLICIDAD') || g.id === 'gt-publicidad') {
+      if (
+        nombre.includes('PUBLICIDAD') ||
+        g.id === 'gt-publicidad' ||
+        nombre.includes('MECADEO') ||
+        g.id === 'gt-mercadeo' ||
+        nombre.includes('MERCADEO')
+      ) {
         nombre = 'MERCADEO';
         codigo = 'MER';
         id = 'gt-mercadeo';
@@ -214,6 +220,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         descripcion,
       };
     });
+
+    // Ensure MERCADEO is always present
+    const hasMercadeo = mapped.some((g) => g.id === 'gt-mercadeo' || g.nombre === 'MERCADEO');
+    if (!hasMercadeo) {
+      const initMercadeo = INITIAL_GTS.find((g) => g.id === 'gt-mercadeo');
+      if (initMercadeo) mapped.push(initMercadeo);
+    }
+
+    // Ensure all 9 initial GTs exist
+    for (const initGt of INITIAL_GTS) {
+      if (!mapped.some((g) => g.id === initGt.id || g.nombre === initGt.nombre)) {
+        mapped.push(initGt);
+      }
+    }
+
+    return mapped;
   });
 
   const [personas, setPersonas] = useState<Persona[]>(() => {
