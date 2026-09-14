@@ -12,6 +12,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { GtProfileModal } from './components/GtProfileModal';
 import { PersonaProfileModal } from './components/PersonaProfileModal';
 import { ConectadoDetalleModal } from './components/ConectadoDetalleModal';
+import { AdminLoginCard } from './components/AdminLoginCard';
 import { Sparkles, Trophy, QrCode, Shield, CheckCircle2, Calendar, Award } from 'lucide-react';
 
 function AppContent() {
@@ -25,6 +26,7 @@ function AppContent() {
     eventos,
     retos,
     asistencias,
+    isAdmin,
   } = useApp();
 
   // Modal inspection states
@@ -253,7 +255,9 @@ function AppContent() {
         {/* ========================================================================= */}
         {/* TAB: PANEL DE ADMINISTRACIÓN                                              */}
         {/* ========================================================================= */}
-        {activeTab === 'admin' && <AdminPanel />}
+        {activeTab === 'admin' && (
+          isAdmin ? <AdminPanel /> : <AdminLoginCard />
+        )}
       </main>
 
       {/* Global Modals for GT and Person Profiles */}

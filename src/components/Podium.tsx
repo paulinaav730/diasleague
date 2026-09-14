@@ -2,6 +2,7 @@ import React from 'react';
 import { GtCalculado } from '../types';
 import { Crown, Sparkles, Trophy, Users, Scale, ArrowUpRight } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useApp } from '../lib/store';
 
 interface PodiumProps {
   podio: GtCalculado[];
@@ -9,6 +10,7 @@ interface PodiumProps {
 }
 
 export const Podium: React.FC<PodiumProps> = ({ podio, onSelectGt }) => {
+  const { modoRanking, setModoRanking, factorBase } = useApp();
   const first = podio[0];
   const second = podio[1];
   const third = podio[2];
@@ -35,22 +37,50 @@ export const Podium: React.FC<PodiumProps> = ({ podio, onSelectGt }) => {
       <div className="absolute -bottom-10 right-10 w-72 h-72 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-center justify-between mb-8 relative z-10">
+      <div className="flex flex-col sm:flex-row items-center justify-between mb-8 relative z-10 gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
               <Sparkles className="w-3.5 h-3.5" />
-              Podio Oficial de la Temporada
+              {modoRanking === 'temporada' ? 'Podio Oficial Temporada 2026-2' : 'Podio Histórico Acumulado'}
             </span>
-            <span className="text-xs text-slate-400 font-medium">Actualización automática</span>
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-amber-400 border border-slate-700">
+              Factor Base {factorBase}x
+            </span>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-black text-white mt-1 tracking-tight">
+          <h2 className="text-2xl sm:text-3xl font-black text-white mt-1.5 tracking-tight">
             Líderes de la DIAS LEAGUE
           </h2>
         </div>
-        <p className="text-xs sm:text-sm text-slate-400 mt-2 sm:mt-0 text-center sm:text-right max-w-xs">
-          Calculado con <span className="text-amber-300 font-bold">Factor de Tamaño</span> para nivelar la competencia entre GTs
-        </p>
+
+        <div className="flex flex-col sm:items-end gap-2">
+          {/* View mode toggle */}
+          <div className="flex items-center p-1 bg-slate-950/80 rounded-xl border border-slate-800 shadow-inner">
+            <button
+              onClick={() => setModoRanking('temporada')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                modoRanking === 'temporada'
+                  ? 'bg-amber-500 text-slate-950 font-black shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              ⚡ Temporada 2026-2
+            </button>
+            <button
+              onClick={() => setModoRanking('acumulado')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                modoRanking === 'acumulado'
+                  ? 'bg-indigo-600 text-white font-black shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              📈 Acumulado
+            </button>
+          </div>
+          <p className="text-xs text-slate-400 text-center sm:text-right">
+            Nivelado con <span className="text-amber-300 font-bold">Fórmula {factorBase} / N</span>
+          </p>
+        </div>
       </div>
 
       {/* Podium Visual Layout */}

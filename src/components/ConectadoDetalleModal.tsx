@@ -60,6 +60,7 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
     eliminarParticipacionReto,
     registrarAsistencia,
     temporadaActiva,
+    factorBase,
   } = useApp();
 
   const evento = eventos.find((e) => e.id === eventoId);
@@ -223,9 +224,10 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
       retos,
       participacionesRetos,
       factores,
-      evento
+      evento,
+      factorBase
     );
-  }, [evento, gts, personas, asistencias, retos, participacionesRetos, factores]);
+  }, [evento, gts, personas, asistencias, retos, participacionesRetos, factores, factorBase]);
 
   // Retos belonging to this Conectado
   const retosConectado = useMemo(() => {

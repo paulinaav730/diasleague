@@ -28,6 +28,7 @@ export const GtAttendanceSizeSection: React.FC = () => {
     asistencias,
     temporadaActiva,
     factorBase,
+    setFactorBase,
     actualizarEvento,
     registrarAsistencia,
     eliminarAsistencia,
@@ -294,16 +295,16 @@ export const GtAttendanceSizeSection: React.FC = () => {
             </h3>
             <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-3xl">
               La asistencia a cada Conectado otorga puntos proporcionales a la cantidad de personas
-              que asisten multiplicada por el <strong>Factor de Tamaño (16 / Integrantes)</strong>,
+              que asisten multiplicada por el <strong className="text-amber-300">Factor de Tamaño ({factorBase} / Integrantes)</strong>,
               garantizando que un GT pequeño y un GT grande compitan en total igualdad de condiciones.
             </p>
           </div>
 
-          {/* Event Picker */}
+          {/* Event Picker & Factor Base Badge */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0 bg-slate-950/70 p-3 rounded-2xl border border-slate-800">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
               <Calendar className="w-4 h-4 text-indigo-400" />
-              <span>Conectado / Evento:</span>
+              <span>Conectado:</span>
             </div>
             <select
               value={selectedEventoId}
@@ -319,29 +320,68 @@ export const GtAttendanceSizeSection: React.FC = () => {
           </div>
         </div>
 
-        {/* Mathematical Formula Banner */}
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-950/60 via-slate-900 to-amber-950/40 border border-amber-500/30 text-xs text-slate-300 space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="font-extrabold text-amber-300 flex items-center gap-1.5 uppercase tracking-wide text-[11px]">
+        {/* Mathematical Formula Banner with Factor Selector */}
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-950/60 via-slate-900 to-amber-950/40 border border-amber-500/30 text-xs text-slate-300 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-amber-400" />
-              Fórmula Oficial de Asistencia DIAS League:
+              <span className="font-extrabold text-amber-300 uppercase tracking-wide text-[11px]">
+                Fórmula de Asistencia Temporada 2026-2:
+              </span>
+            </div>
+            
+            {/* Quick Factor Base selection */}
+            <div className="flex items-center gap-1.5 bg-slate-950/90 px-2.5 py-1 rounded-xl border border-slate-800">
+              <span className="text-[10px] uppercase font-bold text-slate-400">Factor Base:</span>
+              <button
+                type="button"
+                onClick={() => setFactorBase(14)}
+                className={`px-2 py-0.5 rounded text-[11px] font-black transition-all ${
+                  factorBase === 14
+                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Ajustado al GT más grande (14 integrantes = 1.00x)"
+              >
+                14 (Óptimo)
+              </button>
+              <button
+                type="button"
+                onClick={() => setFactorBase(12)}
+                className={`px-2 py-0.5 rounded text-[11px] font-black transition-all ${
+                  factorBase === 12
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                12
+              </button>
+              <button
+                type="button"
+                onClick={() => setFactorBase(16)}
+                className={`px-2 py-0.5 rounded text-[11px] font-black transition-all ${
+                  factorBase === 16
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Histórico 2026-1"
+              >
+                16
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-[11px] font-mono text-amber-200 bg-slate-950/80 px-2.5 py-1 rounded-lg border border-slate-800">
+              DIAS Points = (Asistentes × Puntos Base) × ({factorBase} / Integrantes GT)
             </span>
-            <span className="text-[11px] font-mono text-slate-400 bg-slate-950/80 px-2.5 py-1 rounded-lg border border-slate-800">
-              DIAS Points = (Asistentes × Puntos Base) × (16 / Integrantes GT)
+            <span className="text-[11px] text-slate-400">
+              Al 100% de asistencia, cualquier GT obtiene:{' '}
+              <strong className="text-amber-300">
+                {(selectedEvento?.puntosAsistencia ?? 15) * factorBase} DIAS Points
+              </strong>
             </span>
           </div>
-          <p className="text-[11px] text-slate-300 leading-relaxed">
-            Esta fórmula equivale matemáticamente a:{' '}
-            <strong className="text-amber-200">
-              Puntos Base × 16 × (% Asistencia del GT)
-            </strong>
-            . Si el 100% de un GT asiste (sin importar si tiene 5 o 15 integrantes), recibirá
-            exactamente el máximo de{' '}
-            <strong className="text-amber-300">
-              {(selectedEvento?.puntosAsistencia ?? 15) * 16} DIAS Points
-            </strong>
-            .
-          </p>
         </div>
 
         {/* Edit Base Points Inline */}

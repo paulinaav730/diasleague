@@ -15,20 +15,20 @@ import {
 
 /**
  * Calculates the size factor based on the active member count of the GT.
- * Formula (Spec 23): FACTOR BASE / CANTIDAD DE INTEGRANTES DEL GT (2026-2)
- * Default FACTOR BASE = 16
+ * Formula: FACTOR BASE / CANTIDAD DE INTEGRANTES DEL GT (Temporada 2026-2)
+ * Default FACTOR BASE = 14 (Ajustado al tamaño del GT más grande para evitar inflación)
  *
- * Examples:
- * 10 integrantes: 16 / 10 = 1.6
- * 14 integrantes: 16 / 14 = 1.14
- * 7 integrantes:  16 / 7  = 2.29
- * 8 integrantes:  16 / 8  = 2.0
- * 6 integrantes:  16 / 6  = 2.67
- * 11 integrantes: 16 / 11 = 1.45
+ * Examples (Base 14):
+ * 14 integrantes: 14 / 14 = 1.00 (Base neutral 1.0x para el grupo más numeroso)
+ * 11 integrantes: 14 / 11 = 1.27
+ * 10 integrantes: 14 / 10 = 1.40
+ * 8 integrantes:  14 / 8  = 1.75
+ * 7 integrantes:  14 / 7  = 2.00
+ * 6 integrantes:  14 / 6  = 2.33
  */
 export function calcularFactorTamano(
   integrantes: number,
-  factorBase: number = 16
+  factorBase: number = 14
 ): number {
   if (integrantes <= 0) {
     return Math.round((factorBase / 10) * 100) / 100;
@@ -43,7 +43,7 @@ export function calcularFactorTamano(
 export function getFactorForIntegrantes(
   count: number,
   factores?: FactorTamanoRango[],
-  factorBase: number = 16
+  factorBase: number = 14
 ): number {
   return calcularFactorTamano(count, factorBase);
 }
@@ -94,8 +94,8 @@ export function calcularRankingGts(
   participacionesRetos: ParticipacionReto[],
   factores: FactorTamanoRango[] | undefined,
   temporadaId: string,
-  factorBase: number = 16,
-  modoRanking: 'acumulado' | 'temporada' = 'acumulado'
+  factorBase: number = 14,
+  modoRanking: 'acumulado' | 'temporada' = 'temporada'
 ): GtCalculado[] {
   // Filter active asistencias and retos for this season
   const seasonAsistencias = asistencias.filter(
@@ -290,7 +290,8 @@ export function calcularResultadoConectado(
   retos: Reto[],
   participacionesRetos: ParticipacionReto[],
   factores: FactorTamanoRango[],
-  evento?: Evento
+  evento?: Evento,
+  factorBase: number = 14
 ): ResultadoConectadoGt[] {
   // Filter attendances for this specific Conectado
   const evAsistencias = asistencias.filter(
@@ -315,7 +316,7 @@ export function calcularResultadoConectado(
   const results: ResultadoConectadoGt[] = gts.map((gt) => {
     const activeMembers = personas.filter((p) => p.gtId === gt.id && p.activo);
     const totalIntegrantes = activeMembers.length;
-    const factorTamano = getFactorForIntegrantes(totalIntegrantes, factores);
+    const factorTamano = calcularFactorTamano(totalIntegrantes, factorBase);
 
     // Attendees for this GT in this Conectado (unique participants)
     const gtAsistencias = evAsistencias.filter((a) => a.gtId === gt.id);

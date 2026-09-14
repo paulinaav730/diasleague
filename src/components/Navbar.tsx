@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../lib/store';
 import {
   Trophy,
@@ -9,7 +9,12 @@ import {
   Shield,
   ShieldAlert,
   UserCheck,
+  Lock,
+  Unlock,
+  LogOut,
+  KeyRound,
 } from 'lucide-react';
+import { AdminLoginModal } from './AdminLoginModal';
 
 export type ActiveTab =
   | 'dashboard'
@@ -34,9 +39,12 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab: propActiveTab, setAct
     setTemporadaActivaId,
     isAdmin,
     setIsAdmin,
+    logoutAdmin,
     activeTab: contextActiveTab,
     setActiveTab: contextSetActiveTab,
   } = useApp();
+
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const activeTab = propActiveTab ?? contextActiveTab ?? 'dashboard';
   const setActiveTab = propSetActiveTab ?? contextSetActiveTab;
@@ -164,20 +172,57 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab: propActiveTab, setAct
               </select>
             </div>
 
-            {/* Admin Panel Button */}
-            <button
-              id="btn-nav-admin"
-              onClick={() => setActiveTab('admin')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
-                activeTab === 'admin'
-                  ? 'bg-purple-600 text-white ring-2 ring-purple-400/50'
-                  : 'bg-purple-950/70 text-purple-200 hover:bg-purple-900 border border-purple-500/40'
-              }`}
-              title="Panel Administrativo DIAS"
-            >
-              <Shield className="w-3.5 h-3.5 text-purple-300" />
-              <span>Admin DIAS</span>
-            </button>
+            {/* Admin Panel Button & Lock status */}
+            <div className="flex items-center space-x-1.5">
+              <button
+                id="btn-nav-admin"
+                onClick={() => {
+                  if (isAdmin) {
+                    setActiveTab('admin');
+                  } else {
+                    setShowLoginModal(true);
+                  }
+                }}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
+                  activeTab === 'admin'
+                    ? 'bg-purple-600 text-white ring-2 ring-purple-400/50'
+                    : isAdmin
+                    ? 'bg-purple-950/80 text-purple-200 hover:bg-purple-900 border border-purple-500/40'
+                    : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700'
+                }`}
+                title={isAdmin ? "Panel Administrativo DIAS (Sesión Activa)" : "Ingresar como Administrador (Requiere clave)"}
+              >
+                {isAdmin ? (
+                  <>
+                    <Shield className="w-3.5 h-3.5 text-purple-300" />
+                    <span>Admin</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Admin</span>
+                  </>
+                )}
+              </button>
+
+              {/* Quick Logout if Admin is active */}
+              {isAdmin && (
+                <button
+                  id="btn-nav-logout-admin"
+                  onClick={() => {
+                    logoutAdmin();
+                    if (activeTab === 'admin') {
+                      setActiveTab('dashboard');
+                    }
+                  }}
+                  className="p-1.5 rounded-lg bg-slate-800/90 hover:bg-red-950/70 text-slate-400 hover:text-red-300 border border-slate-700 transition-colors"
+                  title="Cerrar sesión de administrador"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -232,7 +277,33 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab: propActiveTab, setAct
         >
           Gráficas
         </button>
+        <button
+          onClick={() => {
+            if (isAdmin) {
+              setActiveTab('admin');
+            } else {
+              setShowLoginModal(true);
+            }
+          }}
+          className={`px-2.5 py-1 rounded whitespace-nowrap flex items-center gap-1 ${
+            activeTab === 'admin'
+              ? 'bg-purple-600 text-white'
+              : isAdmin
+              ? 'text-purple-300'
+              : 'text-slate-400'
+          }`}
+        >
+          {isAdmin ? <Shield className="w-3 h-3" /> : <Lock className="w-3 h-3 text-amber-400" />}
+          <span>Admin</span>
+        </button>
       </div>
+
+      {/* Admin Login Modal */}
+      <AdminLoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onSuccess={() => setActiveTab('admin')}
+      />
     </header>
   );
 };

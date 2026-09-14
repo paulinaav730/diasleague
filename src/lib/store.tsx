@@ -195,15 +195,19 @@ interface AppContextType {
   // Admin session
   isAdmin: boolean;
   setIsAdmin: (val: boolean) => void;
+  loginAdmin: (password: string) => { success: boolean; message: string };
+  logoutAdmin: () => void;
 }
+
+export const ADMIN_PASSWORD = 'DIAS2580';
 
 const STORAGE_KEY = 'dias_league_state_v2';
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Active Navigation Tab (Defaults directly to admin for full administrative command)
-  const [activeTab, setActiveTab] = useState<ActiveTab>('admin');
+  // Active Navigation Tab
+  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
 
   // Load from LocalStorage or initialize with mock data
   const [temporadas, setTemporadas] = useState<Temporada[]>(() => {
@@ -305,20 +309,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return active ? active.id : TEMPORADA_ACTIVA_ID;
   });
 
-  const [isAdmin, setIsAdmin] = useState<boolean>(true); // Default true for full exploratory access
+  const [isAdmin, setIsAdminState] = useState<boolean>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY + '_isAdmin');
+    return saved === 'true';
+  });
+
+  const setIsAdmin = useCallback((val: boolean) => {
+    setIsAdminState(val);
+    localStorage.setItem(STORAGE_KEY + '_isAdmin', String(val));
+  }, []);
+
+  const loginAdmin = useCallback((password: string): { success: boolean; message: string } => {
+    const clean = (password || '').trim();
+    if (clean === ADMIN_PASSWORD || clean.toUpperCase() === ADMIN_PASSWORD) {
+      setIsAdminState(true);
+      localStorage.setItem(STORAGE_KEY + '_isAdmin', 'true');
+      return { success: true, message: 'Acceso concedido como Administrador DIAS' };
+    }
+    return { success: false, message: 'Clave incorrecta. La clave de administración es DIAS2580.' };
+  }, []);
+
+  const logoutAdmin = useCallback(() => {
+    setIsAdminState(false);
+    localStorage.removeItem(STORAGE_KEY + '_isAdmin');
+  }, []);
 
   const [factorBase, setFactorBaseState] = useState<number>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY + '_factorBase');
-    return saved ? Number(saved) : 16;
+    const saved = localStorage.getItem(STORAGE_KEY + '_factorBase_2026_2') || localStorage.getItem(STORAGE_KEY + '_factorBase');
+    return saved ? Number(saved) : 14;
   });
 
   const [modoRanking, setModoRankingState] = useState<'acumulado' | 'temporada'>(() => {
     const saved = localStorage.getItem(STORAGE_KEY + '_modoRanking');
-    return saved === 'temporada' || saved === 'acumulado' ? saved : 'acumulado';
+    return saved === 'acumulado' ? 'acumulado' : 'temporada';
   });
 
   const setFactorBase = useCallback((base: number) => {
     setFactorBaseState(base);
+    localStorage.setItem(STORAGE_KEY + '_factorBase_2026_2', String(base));
     localStorage.setItem(STORAGE_KEY + '_factorBase', String(base));
   }, []);
 
@@ -1480,6 +1508,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       registrarPuntosGtManual,
       isAdmin,
       setIsAdmin,
+      loginAdmin,
+      logoutAdmin,
     }),
     [
       temporadas,
@@ -1542,6 +1572,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       registrarPuntosPersonaManual,
       registrarPuntosGtManual,
       isAdmin,
+      loginAdmin,
+      logoutAdmin,
       activeTab,
     ]
   );

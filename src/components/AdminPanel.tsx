@@ -29,6 +29,7 @@ import {
   ExternalLink,
   FileSpreadsheet,
   Award,
+  LogOut,
 } from 'lucide-react';
 
 type AdminTab =
@@ -55,6 +56,10 @@ export const AdminPanel: React.FC = () => {
     asistencias,
     participacionesRetos,
     factores,
+    factorBase,
+    setFactorBase,
+    modoRanking,
+    setModoRanking,
     auditLogs,
     temporadaActiva,
     crearTemporada,
@@ -89,6 +94,8 @@ export const AdminPanel: React.FC = () => {
     restablecerDatosPrueba,
     limpiarTodosLosDatos,
     limpiarDatosPrueba,
+    logoutAdmin,
+    setActiveTab,
   } = useApp();
 
   const [activeAdminTab, setActiveAdminTab] = useState<AdminTab>('asistencia_gt');
@@ -208,6 +215,19 @@ export const AdminPanel: React.FC = () => {
             >
               <RotateCcw className="w-3.5 h-3.5" />
               Restablecer Datos EAFIT
+            </button>
+
+            <button
+              id="btn-admin-panel-lock"
+              onClick={() => {
+                logoutAdmin();
+                setActiveTab('dashboard');
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-950/60 hover:bg-purple-900/80 border border-purple-500/40 text-xs text-purple-200 hover:text-white font-bold transition-colors cursor-pointer"
+              title="Cerrar sesión de administrador y bloquear el panel"
+            >
+              <LogOut className="w-3.5 h-3.5 text-purple-300" />
+              <span>Bloquear / Salir</span>
             </button>
           </div>
         </div>
@@ -1024,58 +1044,315 @@ export const AdminPanel: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB: FACTORES DE TAMAÑO                                                   */}
+      {/* TAB: FACTORES DE TAMAÑO & CALIBRACIÓN 2026-2                              */}
       {/* ========================================================================= */}
       {activeAdminTab === 'factores' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-5">
-          <div>
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Scale className="w-5 h-5 text-amber-400" />
-              Configuración Dinámica de Factores de Tamaño
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-400 mt-1">
-              Modifica los multiplicadores utilizados para equilibrar los puntos de los Grupos de Trabajo (GTs)
-              según su número de integrantes.
-            </p>
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-7">
+          {/* Header */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs uppercase font-extrabold tracking-wider text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-0.5 rounded-full">
+                  Temporada Activa: 2026-2
+                </span>
+                <span className="text-xs text-slate-400">
+                  Calibración de Equidad Matemática
+                </span>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-black text-white mt-1.5 flex items-center gap-2.5">
+                <Scale className="w-6 h-6 text-amber-400" />
+                Ajuste del Factor de Tamaño (Temporada 2026-2)
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-3xl">
+                El Factor de Tamaño equilibra la competencia entre GTs pequeños y grandes mediante la fórmula oficial:{' '}
+                <strong className="text-amber-300">Factor = Factor Base / Integrantes</strong>.
+                Todos los puntos de asistencia y ranking de 2026-2 se recalculan instantáneamente con este valor.
+              </p>
+            </div>
+
+            {/* Quick Mode Toggle */}
+            <div className="flex flex-col items-start lg:items-end gap-2 shrink-0 bg-slate-950/80 p-4 rounded-2xl border border-slate-800">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                Visualización Predeterminada del Ranking:
+              </span>
+              <div className="flex items-center p-1 bg-slate-900 rounded-xl border border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModoRanking('temporada');
+                    showFeedback('✓ Modo ranking establecido en Solo Temporada 2026-2');
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    modoRanking === 'temporada'
+                      ? 'bg-amber-500 text-slate-950 shadow-md font-black'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  ⚡ Solo Temporada 2026-2
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModoRanking('acumulado');
+                    showFeedback('✓ Modo ranking establecido en Historial Acumulado (2026-1 + 2026-2)');
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    modoRanking === 'acumulado'
+                      ? 'bg-indigo-600 text-white shadow-md font-black'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  📈 Acumulado Total
+                </button>
+              </div>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {factores.map((f) => (
-              <div
-                key={f.id}
-                className="p-5 rounded-2xl bg-slate-800/80 border border-slate-700 space-y-3"
-              >
-                <div className="flex justify-between items-center">
-                  <span className="text-xs uppercase font-bold text-amber-400">
-                    {f.minIntegrantes} a {f.maxIntegrantes ?? 'más'} integrantes
-                  </span>
-                  <span className="text-lg font-black text-white">
-                    {f.factor}x
-                  </span>
-                </div>
-
+          {/* Factor Base Controls */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Main Controller Card */}
+            <div className="lg:col-span-2 bg-slate-950/60 border border-slate-800 rounded-2xl p-6 space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <label className="block text-[11px] text-slate-400 mb-1">
-                    Multiplicador (Factor):
-                  </label>
-                  <input
-                    type="number"
-                    step="0.05"
-                    min="0.5"
-                    max="2.5"
-                    value={f.factor}
-                    onChange={(e) =>
-                      actualizarFactor(f.id, Number(e.target.value))
-                    }
-                    className="w-full bg-slate-900 text-amber-300 font-bold text-sm p-2 rounded-xl border border-slate-700 text-center"
-                  />
+                  <h4 className="text-base font-bold text-white flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
+                    Valor Actual del Factor Base
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Define el numerador de la división. Recomendamos <strong>14</strong> (el tamaño del GT más grande de 2026-2).
+                  </p>
                 </div>
-
-                <p className="text-[11px] text-slate-400">
-                  {f.descripcion || 'Ponderación de equilibrio'}
-                </p>
+                <div className="flex items-center gap-3 bg-slate-900 px-4 py-2.5 rounded-2xl border border-slate-700 shadow-inner">
+                  <span className="text-xs text-slate-400 font-medium">Base:</span>
+                  <span className="text-3xl font-black text-amber-400 tracking-tight">
+                    {factorBase}
+                  </span>
+                </div>
               </div>
-            ))}
+
+              {/* Presets */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-300 block">
+                  Ajustes Rápidos Recomendados:
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFactorBase(14);
+                      showFeedback('✓ Factor Base ajustado a 14 (Recomendado 2026-2)');
+                    }}
+                    className={`p-3.5 rounded-xl border text-left transition-all relative overflow-hidden ${
+                      factorBase === 14
+                        ? 'bg-amber-500/15 border-amber-500/60 ring-2 ring-amber-500/30 text-amber-200'
+                        : 'bg-slate-900/90 border-slate-700/80 hover:border-slate-500 text-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-black">Base 14</span>
+                      <span className="text-[10px] uppercase font-extrabold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">
+                        Óptimo 2026-2
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Alineado al GT más grande. El grupo de 14 tiene factor 1.00x sin inflación artificial.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFactorBase(12);
+                      showFeedback('✓ Factor Base ajustado a 12 (Escala Compacta)');
+                    }}
+                    className={`p-3.5 rounded-xl border text-left transition-all ${
+                      factorBase === 12
+                        ? 'bg-indigo-500/15 border-indigo-500/60 ring-2 ring-indigo-500/30 text-indigo-200'
+                        : 'bg-slate-900/90 border-slate-700/80 hover:border-slate-500 text-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-black">Base 12</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400">
+                        Compacto
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Comprime las diferencias de factor, reduciendo la ventaja de grupos pequeños.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFactorBase(16);
+                      showFeedback('✓ Factor Base ajustado a 16 (Histórico 2026-1)');
+                    }}
+                    className={`p-3.5 rounded-xl border text-left transition-all ${
+                      factorBase === 16
+                        ? 'bg-purple-500/15 border-purple-500/60 ring-2 ring-purple-500/30 text-purple-200'
+                        : 'bg-slate-900/90 border-slate-700/80 hover:border-slate-500 text-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-black">Base 16</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400">
+                        Histórico
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Fórmula original utilizada en el semestre 2026-1. Multiplicadores más altos.
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Slider & manual adjustment */}
+              <div className="pt-2">
+                <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+                  <span>Ajuste Manual Fino:</span>
+                  <span className="font-mono text-amber-300 font-bold">{factorBase} / N</span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min="8"
+                    max="22"
+                    step="1"
+                    value={factorBase}
+                    onChange={(e) => setFactorBase(Number(e.target.value))}
+                    className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                  />
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setFactorBase(Math.max(8, factorBase - 1))}
+                      className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 font-black text-white text-base flex items-center justify-center"
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      min="8"
+                      max="30"
+                      value={factorBase}
+                      onChange={(e) => setFactorBase(Math.max(1, Number(e.target.value)))}
+                      className="w-14 bg-slate-900 text-amber-300 font-black text-center text-sm py-1 rounded-lg border border-slate-700"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFactorBase(Math.min(30, factorBase + 1))}
+                      className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 font-black text-white text-base flex items-center justify-center"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Formula Explanation Card */}
+            <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between space-y-4">
+              <div>
+                <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-2 text-amber-400">
+                  ¿Por qué se ajusta a 14 en 2026-2?
+                </h4>
+                <p className="text-xs text-slate-300 leading-relaxed space-y-2">
+                  En 2026-1, con Base 16, un GT de 14 personas recibía factor <strong>1.14x</strong> (se inflaban sus puntos),
+                  mientras que con <strong>Base 14</strong>:
+                </p>
+                <ul className="text-xs text-slate-400 mt-3 space-y-1.5 list-disc pl-4">
+                  <li>El GT más numeroso (14 miembros) recibe exactamente <strong>1.00x</strong> (puntos netos sin distorsión).</li>
+                  <li>Un GT mediano de 10 miembros recibe <strong>1.40x</strong>.</li>
+                  <li>Un GT pequeño de 7 miembros recibe <strong>2.00x</strong>.</li>
+                </ul>
+              </div>
+
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-200">
+                <span className="font-bold block mb-0.5">Equidad al 100%:</span>
+                Si cualquier GT asiste con el 100% de su gente a un Conectado de 30 pts, todos obtienen exactamente{' '}
+                <strong>{30 * factorBase} DIAS Points</strong>.
+              </div>
+            </div>
+          </div>
+
+          {/* Real-time simulation table for all 9 GTs */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <Users className="w-4 h-4 text-indigo-400" />
+                Simulación en Tiempo Real para los 9 GTs (Base {factorBase})
+              </h4>
+              <span className="text-xs text-slate-400">
+                Conectado de prueba: 30 pts base por asistente
+              </span>
+            </div>
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/50">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="bg-slate-900 text-slate-400 uppercase text-[10px] font-extrabold tracking-wider border-b border-slate-800">
+                  <tr>
+                    <th className="py-3 px-4">Grupo de Trabajo</th>
+                    <th className="py-3 px-4 text-center">Integrantes Activos</th>
+                    <th className="py-3 px-4 text-center">Fórmula Aplicada</th>
+                    <th className="py-3 px-4 text-center">Factor Resultante</th>
+                    <th className="py-3 px-4 text-right">Pts por 1 Asistente</th>
+                    <th className="py-3 px-4 text-right">Pts al 100% Asistencia</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {gts.map((gt) => {
+                    const activeCount = personas.filter((p) => p.gtId === gt.id && p.activo).length || 10;
+                    const factorCalc = Math.round((factorBase / activeCount) * 100) / 100;
+                    const pts1 = Math.round(30 * factorCalc * 10) / 10;
+                    const pts100 = Math.round(activeCount * 30 * factorCalc);
+
+                    return (
+                      <tr key={gt.id} className="hover:bg-slate-900/40 transition-colors">
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2.5">
+                            <div
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-black text-xs ring-1 ring-white/20"
+                              style={{ backgroundColor: gt.color }}
+                            >
+                              {gt.codigo}
+                            </div>
+                            <span className="font-bold text-white uppercase">{gt.nombre}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-center whitespace-nowrap">
+                          <span className="px-2.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 font-bold text-slate-200">
+                            {activeCount} personas
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center whitespace-nowrap font-mono text-slate-400">
+                          {factorBase} / {activeCount}
+                        </td>
+                        <td className="py-3 px-4 text-center whitespace-nowrap">
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full font-black text-xs border ${
+                              factorCalc >= 2.0
+                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                                : factorCalc > 1.2
+                                ? 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                            }`}
+                          >
+                            {factorCalc.toFixed(2)}x
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right whitespace-nowrap font-medium text-slate-300">
+                          +{pts1} pts
+                        </td>
+                        <td className="py-3 px-4 text-right whitespace-nowrap font-bold text-amber-300">
+                          {pts100} pts
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

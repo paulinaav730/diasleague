@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { GtCalculado } from '../types';
-import { Trophy, Users, Search, ArrowUpDown, ChevronRight, Info } from 'lucide-react';
+import { Trophy, Users, Search, ArrowUpDown, ChevronRight, Info, Scale, Sparkles } from 'lucide-react';
+import { useApp } from '../lib/store';
 
 interface GtRankingTableProps {
   ranking: GtCalculado[];
@@ -8,6 +9,7 @@ interface GtRankingTableProps {
 }
 
 export const GtRankingTable: React.FC<GtRankingTableProps> = ({ ranking, onSelectGt }) => {
+  const { modoRanking, setModoRanking, factorBase } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [showFactorExplanation, setShowFactorExplanation] = useState(false);
 
@@ -20,23 +22,55 @@ export const GtRankingTable: React.FC<GtRankingTableProps> = ({ ranking, onSelec
   const totalPuntos = ranking.reduce((acc, item) => acc + item.diasPointsFinal, 0);
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl space-y-6">
+      {/* Header & Controls */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
               <Trophy className="w-5 h-5 text-amber-400" />
               Tabla General de Grupos de Trabajo (GTs)
             </h3>
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+              Base {factorBase}x
+            </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Ranking oficial actualizado en tiempo real con ponderación por factor de tamaño
+            {modoRanking === 'temporada'
+              ? 'Puntuación oficial de la Temporada 2026-2 nivelada por factor de tamaño.'
+              : 'Puntuación histórica acumulada oficial (Semestre 2026-1 + Temporada 2026-2).'}
           </p>
         </div>
 
-        {/* Search bar & factor help */}
-        <div className="flex items-center gap-2">
+        {/* View Mode Toggle & Search */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Season Switcher */}
+          <div className="flex items-center p-1 bg-slate-950 rounded-xl border border-slate-800 shadow-inner">
+            <button
+              id="ranking-toggle-temporada"
+              onClick={() => setModoRanking('temporada')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                modoRanking === 'temporada'
+                  ? 'bg-amber-500 text-slate-950 font-black shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <span>⚡ Temporada 2026-2</span>
+            </button>
+            <button
+              id="ranking-toggle-acumulado"
+              onClick={() => setModoRanking('acumulado')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                modoRanking === 'acumulado'
+                  ? 'bg-indigo-600 text-white font-black shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <span>📈 Acumulado</span>
+            </button>
+          </div>
+
+          {/* Search bar */}
           <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -45,44 +79,49 @@ export const GtRankingTable: React.FC<GtRankingTableProps> = ({ ranking, onSelec
               placeholder="Buscar GT..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="bg-slate-800/90 text-xs sm:text-sm text-white pl-9 pr-3 py-1.5 rounded-xl border border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-36 sm:w-48 placeholder-slate-500"
+              className="bg-slate-800/90 text-xs sm:text-sm text-white pl-9 pr-3 py-1.5 rounded-xl border border-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500 w-36 sm:w-44 placeholder-slate-500"
             />
           </div>
 
           <button
             onClick={() => setShowFactorExplanation(!showFactorExplanation)}
-            className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 text-xs flex items-center gap-1"
-            title="¿Cómo funciona el factor de tamaño?"
+            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 text-xs flex items-center gap-1.5"
+            title="¿Cómo se calcula el factor de tamaño?"
           >
-            <Info className="w-4 h-4 text-amber-400" />
-            <span className="hidden sm:inline">Fórmula</span>
+            <Scale className="w-4 h-4 text-amber-400" />
+            <span className="hidden sm:inline font-bold">Fórmula {factorBase}</span>
           </button>
         </div>
       </div>
 
       {/* Factor formula banner if toggled */}
       {showFactorExplanation && (
-        <div className="mb-6 p-4 bg-slate-800/70 border border-amber-500/30 rounded-2xl text-xs text-slate-300">
-          <div className="flex items-start gap-2">
-            <Info className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-            <div>
-              <span className="font-bold text-amber-300 text-sm block mb-1">
-                Fórmula de Competencia Justa:
+        <div className="p-4 bg-slate-800/80 border border-amber-500/40 rounded-2xl text-xs text-slate-300 space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Scale className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="font-black text-amber-300 text-sm">
+                Fórmula de Competencia Justa Calibrada (2026-2):
               </span>
-              <p className="mb-1 text-slate-200">
-                <code className="bg-slate-900 px-2 py-0.5 rounded text-amber-300 font-mono font-bold">
-                  DIAS POINTS = PUNTOS BRUTOS × FACTOR DE TAMAÑO
-                </code>
-              </p>
-              <p className="text-slate-400">
-                Debido a que los GTs tienen diferente número de miembros (ej. Finanzas 3 vs Generales 15),
-                el factor de tamaño equilibra el esfuerzo:
-                <span className="text-slate-200 ml-1">
-                  1-5 integrantes (1.3x) • 6-10 integrantes (1.1x) • 11+ integrantes (1.0x).
-                </span>
-              </p>
             </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-amber-400 border border-amber-500/30">
+              Factor Base: {factorBase}
+            </span>
           </div>
+
+          <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 font-mono text-xs flex flex-wrap items-center gap-3">
+            <span className="text-amber-300 font-bold">
+              DIAS POINTS = PUNTOS BRUTOS × ({factorBase} / INTEGRANTES)
+            </span>
+          </div>
+
+          <p className="text-slate-400 leading-relaxed">
+            Cada GT tiene un factor calculado exactamente como{' '}
+            <strong className="text-white">{factorBase} dividido entre su número de integrantes</strong>.
+            Con Base 14, el grupo más numeroso (14 integrantes) tiene factor <strong>1.00x</strong> (sin inflación artificial),
+            mientras un grupo de 10 tiene <strong>1.40x</strong> y uno de 7 tiene <strong>2.00x</strong>.
+            Así, si dos grupos asisten al 100%, ambos ganan exactamente la misma cantidad de DIAS Points.
+          </p>
         </div>
       )}
 
