@@ -14,6 +14,7 @@ import {
   Plus,
   Tv,
   ArrowRight,
+  Trash2,
 } from 'lucide-react';
 
 interface EventosViewProps {
@@ -34,6 +35,7 @@ export const EventosView: React.FC<EventosViewProps> = ({
     temporadaActiva,
     isAdmin,
     crearEvento,
+    eliminarEvento,
     cambiarEstadoEvento,
   } = useApp();
 
@@ -251,6 +253,22 @@ export const EventosView: React.FC<EventosViewProps> = ({
                   >
                     <span>Registrar</span>
                     <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          `¿Eliminar el evento "${evento.nombre}"?\n\nEsta acción eliminará el evento, sus turnos, asistencias y TODOS los retos y puntos vinculados.`
+                        )
+                      ) {
+                        eliminarEvento(evento.id);
+                      }
+                    }}
+                    className="p-2 rounded-xl bg-red-950/40 hover:bg-red-900 border border-red-800/80 text-red-400 hover:text-white transition-colors"
+                    title="Eliminar evento y sus retos asociados"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>

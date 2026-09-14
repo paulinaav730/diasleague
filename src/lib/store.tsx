@@ -202,8 +202,8 @@ const STORAGE_KEY = 'dias_league_state_v2';
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Active Navigation Tab
-  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  // Active Navigation Tab (Defaults directly to admin for full administrative command)
+  const [activeTab, setActiveTab] = useState<ActiveTab>('admin');
 
   // Load from LocalStorage or initialize with mock data
   const [temporadas, setTemporadas] = useState<Temporada[]>(() => {
@@ -835,12 +835,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const eliminarEvento = useCallback(
     (id: string) => {
       const e = eventos.find((item) => item.id === id);
+      // Extraer IDs de retos vinculados a este evento
+      const retosDelEvento = retos.filter((r) => r.eventoId === id).map((r) => r.id);
+
       setEventos((prev) => prev.filter((item) => item.id !== id));
       setTurnos((prev) => prev.filter((t) => t.eventoId !== id));
       setAsistencias((prev) => prev.filter((a) => a.eventoId !== id));
-      addAuditLog('ELIMINAR_EVENTO', 'evento', id, `Se eliminó el evento ${e?.nombre || id}`);
+      setRetos((prev) => prev.filter((r) => r.eventoId !== id));
+      setParticipacionesRetos((prev) =>
+        prev.filter((pr) => pr.eventoId !== id && !retosDelEvento.includes(pr.retoId))
+      );
+      addAuditLog('ELIMINAR_EVENTO', 'evento', id, `Se eliminó el evento "${e?.nombre || id}" y todos sus retos y asistencias asociadas`);
     },
-    [eventos, addAuditLog]
+    [eventos, retos, addAuditLog]
   );
 
   // Turnos & QR

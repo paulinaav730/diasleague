@@ -82,27 +82,27 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
   const [showAddReto, setShowAddReto] = useState(false);
   const [newRetoNombre, setNewRetoNombre] = useState('');
   const [newRetoDesc, setNewRetoDesc] = useState('');
-  const [newRetoPuntos, setNewRetoPuntos] = useState(25);
+  const [newRetoPuntos, setNewRetoPuntos] = useState(100);
   const [newRetoTipo, setNewRetoTipo] = useState<'grupal' | 'individual'>('grupal');
 
   // Edit Reto Form State
   const [editingRetoId, setEditingRetoId] = useState<string | null>(null);
   const [editRetoNombre, setEditRetoNombre] = useState('');
   const [editRetoDesc, setEditRetoDesc] = useState('');
-  const [editRetoPuntos, setEditRetoPuntos] = useState(25);
+  const [editRetoPuntos, setEditRetoPuntos] = useState(100);
   const [editRetoRetroactivo, setEditRetoRetroactivo] = useState(true);
 
   // Edit Individual Attendance / Reto Participation State
   const [editingAsistId, setEditingAsistId] = useState<string | null>(null);
-  const [editingAsistPuntos, setEditingAsistPuntos] = useState<number>(10);
+  const [editingAsistPuntos, setEditingAsistPuntos] = useState<number>(15);
   const [editingPartId, setEditingPartId] = useState<string | null>(null);
-  const [editingPartPuntos, setEditingPartPuntos] = useState<number>(25);
+  const [editingPartPuntos, setEditingPartPuntos] = useState<number>(100);
 
   // Assign Winner Form State
   const [assigningRetoId, setAssigningRetoId] = useState<string | null>(null);
   const [winnerGtId, setWinnerGtId] = useState<string>(gts[0]?.id || '');
   const [winnerPosicion, setWinnerPosicion] = useState<number>(1);
-  const [winnerPuntos, setWinnerPuntos] = useState<number>(25);
+  const [winnerPuntos, setWinnerPuntos] = useState<number>(100);
 
   // Quick Manual Attendance State
   const [manualNombre, setManualNombre] = useState('');
@@ -576,18 +576,37 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-xs text-slate-300 font-bold mb-1">
-                        Puntos que otorga
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs text-slate-300 font-bold">
+                          Puntos que otorga (+pts)
+                        </label>
+                        <span className="text-[10px] text-amber-400 font-bold">Valores altos:</span>
+                      </div>
                       <input
                         type="number"
                         min="1"
-                        max="200"
+                        step="5"
                         value={newRetoPuntos}
                         onChange={(e) => setNewRetoPuntos(Number(e.target.value))}
-                        className="w-full bg-slate-900 text-white px-3 py-2 rounded-xl border border-slate-700 text-xs font-bold"
+                        className="w-full bg-slate-900 text-amber-300 px-3 py-2 rounded-xl border border-slate-700 text-xs font-black"
                         required
                       />
+                      <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                        {[50, 100, 150, 200, 300, 500].map((pts) => (
+                          <button
+                            key={pts}
+                            type="button"
+                            onClick={() => setNewRetoPuntos(pts)}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
+                              newRetoPuntos === pts
+                                ? 'bg-amber-500 text-slate-950 shadow'
+                                : 'bg-slate-900 text-amber-300 hover:bg-slate-700 border border-slate-700'
+                            }`}
+                          >
+                            +{pts}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
@@ -736,18 +755,37 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
                               </div>
 
                               <div>
-                                <label className="block text-[11px] text-slate-400 font-bold mb-1">
-                                  Puntos que otorga (+pts)
-                                </label>
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="block text-[11px] text-slate-400 font-bold">
+                                    Puntos que otorga (+pts)
+                                  </label>
+                                  <span className="text-[10px] text-amber-400 font-bold">Valores altos:</span>
+                                </div>
                                 <input
                                   type="number"
-                                  min="0"
-                                  max="300"
+                                  min="1"
+                                  step="5"
                                   value={editRetoPuntos}
                                   onChange={(e) => setEditRetoPuntos(Number(e.target.value))}
                                   className="w-full bg-slate-800 text-amber-400 font-extrabold text-xs p-2 rounded-lg border border-slate-700"
                                   required
                                 />
+                                <div className="flex flex-wrap items-center gap-1 mt-1">
+                                  {[50, 100, 150, 200, 300, 500].map((pts) => (
+                                    <button
+                                      key={pts}
+                                      type="button"
+                                      onClick={() => setEditRetoPuntos(pts)}
+                                      className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
+                                        editRetoPuntos === pts
+                                          ? 'bg-amber-500 text-slate-950 shadow'
+                                          : 'bg-slate-900 text-amber-300 hover:bg-slate-700 border border-slate-700'
+                                      }`}
+                                    >
+                                      +{pts}
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
                             </div>
 
@@ -800,7 +838,7 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
                               Asignar GT Ganador para "{reto.nombre}"
                             </h5>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <div>
                                 <label className="block text-[11px] text-slate-400 mb-1">
                                   GT Ganador
@@ -820,28 +858,15 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
 
                               <div>
                                 <label className="block text-[11px] text-slate-400 mb-1">
-                                  Puesto obtenido
-                                </label>
-                                <select
-                                  value={winnerPosicion}
-                                  onChange={(e) => setWinnerPosicion(Number(e.target.value))}
-                                  className="w-full bg-slate-800 text-white text-xs p-2 rounded-lg border border-slate-700 font-bold"
-                                >
-                                  <option value={1}>1º Lugar (Campeón del Reto)</option>
-                                  <option value={2}>2º Lugar</option>
-                                  <option value={3}>3º Lugar</option>
-                                </select>
-                              </div>
-
-                              <div>
-                                <label className="block text-[11px] text-slate-400 mb-1">
-                                  Puntos a otorgar
+                                  Puntos a otorgar (+pts)
                                 </label>
                                 <input
                                   type="number"
+                                  min="1"
+                                  step="5"
                                   value={winnerPuntos}
                                   onChange={(e) => setWinnerPuntos(Number(e.target.value))}
-                                  className="w-full bg-slate-800 text-white text-xs p-2 rounded-lg border border-slate-700 font-bold"
+                                  className="w-full bg-slate-800 text-amber-300 font-black text-xs p-2 rounded-lg border border-slate-700"
                                 />
                               </div>
                             </div>

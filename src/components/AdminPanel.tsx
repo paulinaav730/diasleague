@@ -3,6 +3,8 @@ import { useApp } from '../lib/store';
 import { Evento } from '../types';
 import { ExcelImportSection } from './admin/ExcelImportSection';
 import { ManualPointsSection } from './admin/ManualPointsSection';
+import { GtAttendanceSizeSection } from './admin/GtAttendanceSizeSection';
+import { ConectadoDetalleModal } from './ConectadoDetalleModal';
 import {
   Shield,
   Trophy,
@@ -30,11 +32,12 @@ import {
 } from 'lucide-react';
 
 type AdminTab =
+  | 'asistencia_gt'
+  | 'eventos_turnos'
+  | 'retos'
   | 'importar_personas'
   | 'registrar_puntos'
   | 'personas'
-  | 'eventos_turnos'
-  | 'retos'
   | 'factores'
   | 'gts'
   | 'temporadas'
@@ -67,6 +70,7 @@ export const AdminPanel: React.FC = () => {
     eliminarPersona,
     crearEvento,
     actualizarEvento,
+    eliminarEvento,
     cambiarEstadoEvento,
     crearTurno,
     actualizarTurno,
@@ -87,7 +91,28 @@ export const AdminPanel: React.FC = () => {
     limpiarDatosPrueba,
   } = useApp();
 
-  const [activeAdminTab, setActiveAdminTab] = useState<AdminTab>('importar_personas');
+  const [activeAdminTab, setActiveAdminTab] = useState<AdminTab>('asistencia_gt');
+
+  // Selected Conectado Modal for deep inspection/scoring
+  const [selectedConectadoModalId, setSelectedConectadoModalId] = useState<string | null>(null);
+
+  // New Event Modal State
+  const [showCreateEventoModal, setShowCreateEventoModal] = useState(false);
+  const [newEventoNombre, setNewEventoNombre] = useState('');
+  const [newEventoDesc, setNewEventoDesc] = useState('');
+  const [newEventoFecha, setNewEventoFecha] = useState(new Date().toISOString().split('T')[0]);
+  const [newEventoPuntos, setNewEventoPuntos] = useState(15);
+  const [newEventoTipo, setNewEventoTipo] = useState<Evento['tipoEvento']>('conectado');
+  const [newEventoUsaQr, setNewEventoUsaQr] = useState(true);
+  const [newEventoUsaTurnos, setNewEventoUsaTurnos] = useState(false);
+
+  // New Reto Modal State (High points by default)
+  const [showCreateRetoModal, setShowCreateRetoModal] = useState(false);
+  const [newRetoEventoId, setNewRetoEventoId] = useState('');
+  const [newRetoNombre, setNewRetoNombre] = useState('');
+  const [newRetoDesc, setNewRetoDesc] = useState('');
+  const [newRetoPuntos, setNewRetoPuntos] = useState(100);
+  const [newRetoTipo, setNewRetoTipo] = useState<'grupal' | 'individual'>('grupal');
 
   // Reto editing state
   const [editingRetoId, setEditingRetoId] = useState<string | null>(null);
@@ -198,6 +223,42 @@ export const AdminPanel: React.FC = () => {
         {/* Secondary Admin Navigation Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto pt-6 border-t border-slate-800/80 mt-6 text-xs font-semibold">
           <button
+            onClick={() => setActiveAdminTab('asistencia_gt')}
+            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
+              activeAdminTab === 'asistencia_gt'
+                ? 'bg-amber-600 text-white shadow ring-2 ring-amber-400/50'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5 text-amber-400" />
+            <span>Asistencia x Tamaño GT</span>
+          </button>
+
+          <button
+            onClick={() => setActiveAdminTab('eventos_turnos')}
+            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
+              activeAdminTab === 'eventos_turnos'
+                ? 'bg-indigo-600 text-white shadow ring-2 ring-indigo-400/50'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Calendar className="w-3.5 h-3.5" />
+            <span>Eventos & Conectados ({eventos.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveAdminTab('retos')}
+            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
+              activeAdminTab === 'retos'
+                ? 'bg-purple-600 text-white shadow ring-2 ring-purple-400/50'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-purple-300" />
+            <span>Retos & Desafíos ({retos.length})</span>
+          </button>
+
+          <button
             onClick={() => setActiveAdminTab('importar_personas')}
             className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
               activeAdminTab === 'importar_personas'
@@ -231,30 +292,6 @@ export const AdminPanel: React.FC = () => {
           >
             <Users className="w-3.5 h-3.5" />
             <span>Integrantes ({personas.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveAdminTab('eventos_turnos')}
-            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
-              activeAdminTab === 'eventos_turnos'
-                ? 'bg-purple-600 text-white shadow'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            <span>Eventos & Turnos QR</span>
-          </button>
-
-          <button
-            onClick={() => setActiveAdminTab('retos')}
-            className={`px-3.5 py-2 rounded-xl whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
-              activeAdminTab === 'retos'
-                ? 'bg-purple-600 text-white shadow'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Retos & Desafíos</span>
           </button>
 
           <button
@@ -320,6 +357,11 @@ export const AdminPanel: React.FC = () => {
       </div>
 
       {/* ========================================================================= */}
+      {/* TAB: ASISTENCIA X TAMAÑO DE GT (PONDERACIÓN JUSTA)                        */}
+      {/* ========================================================================= */}
+      {activeAdminTab === 'asistencia_gt' && <GtAttendanceSizeSection />}
+
+      {/* ========================================================================= */}
       {/* TAB: IMPORTAR PERSONAS (EXCEL MAESTRO)                                     */}
       {/* ========================================================================= */}
       {activeAdminTab === 'importar_personas' && (
@@ -337,14 +379,30 @@ export const AdminPanel: React.FC = () => {
       {activeAdminTab === 'eventos_turnos' && (
         <div className="space-y-6">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl">
-            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-indigo-400" />
-              Gestión de Eventos y Configuración de Puntos
-            </h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+              <div>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-indigo-400" />
+                  Gestión de Eventos y Configuración de Puntos
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Crea, gestiona o elimina eventos y Conectados. Cada evento contiene sus retos internos y asistencias.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowCreateEventoModal(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 shrink-0 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Crear Nuevo Evento / Conectado</span>
+              </button>
+            </div>
 
             <div className="divide-y divide-slate-800">
               {eventos.map((e) => {
                 const eventoTurnos = turnos.filter((t) => t.eventoId === e.id);
+                const retosDelEvento = retos.filter((r) => r.eventoId === e.id);
 
                 return (
                   <div key={e.id} className="py-4 first:pt-0 last:pb-0 space-y-3">
@@ -362,6 +420,9 @@ export const AdminPanel: React.FC = () => {
                             }`}
                           >
                             {e.estado}
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                            {retosDelEvento.length} retos
                           </span>
                         </div>
                         <p className="text-xs text-slate-400 mt-0.5">{e.descripcion}</p>
@@ -414,6 +475,32 @@ export const AdminPanel: React.FC = () => {
                           <option value="activo">🟢 Activo</option>
                           <option value="finalizado">Finalizado</option>
                         </select>
+
+                        <button
+                          onClick={() => setSelectedConectadoModalId(e.id)}
+                          className="px-3 py-1.5 rounded-xl bg-purple-600/80 hover:bg-purple-600 text-white font-bold text-xs flex items-center gap-1 shadow cursor-pointer"
+                          title="Gestionar retos internos y calificar Conectado"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                          <span>Retos & Detalle</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `¿Eliminar el evento "${e.nombre}"?\n\nEsta acción eliminará el evento, todos sus turnos, sus asistencias y TODOS los retos y puntos vinculados a este evento.`
+                              )
+                            ) {
+                              eliminarEvento(e.id);
+                              showFeedback(`Evento "${e.nombre}" eliminado correctamente.`);
+                            }
+                          }}
+                          className="p-2 rounded-xl bg-red-950/40 hover:bg-red-900 border border-red-800 text-red-400 hover:text-white transition-colors cursor-pointer"
+                          title="Eliminar este evento y sus retos asociados"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
 
@@ -514,16 +601,27 @@ export const AdminPanel: React.FC = () => {
         <div className="space-y-6">
           {/* Section: Catálogo y Edición de Valores de Retos */}
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   <Award className="w-5 h-5 text-amber-400" />
                   Catálogo de Retos y Modificación de Valores
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Modifica el valor en puntos de los retos y decide si deseas recalcular retroactivamente a los ganadores ya registrados.
+                  Crea retos con valores altos (+50, +100, +200, +500 pts), edita sus puntos retroactivamente o elimínalos.
                 </p>
               </div>
+
+              <button
+                onClick={() => {
+                  setNewRetoEventoId(eventos[0]?.id || '');
+                  setShowCreateRetoModal(true);
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-600/30 shrink-0 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Crear Nuevo Reto (+pts altos)</span>
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
@@ -568,17 +666,36 @@ export const AdminPanel: React.FC = () => {
                         </div>
 
                         <div>
-                          <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                            Nuevo Valor (+pts):
-                          </label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-[11px] font-bold text-slate-300">
+                              Nuevo Valor (+pts):
+                            </label>
+                            <span className="text-[10px] text-amber-400 font-bold">Valores altos:</span>
+                          </div>
                           <input
                             type="number"
-                            min="0"
+                            min="1"
                             step="5"
                             value={editRetoPuntos}
                             onChange={(e) => setEditRetoPuntos(Number(e.target.value))}
                             className="w-full bg-slate-800 text-amber-300 font-extrabold px-2 py-1 rounded border border-slate-700 text-xs"
                           />
+                          <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                            {[50, 100, 150, 200, 300, 500].map((val) => (
+                              <button
+                                key={val}
+                                type="button"
+                                onClick={() => setEditRetoPuntos(val)}
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
+                                  editRetoPuntos === val
+                                    ? 'bg-amber-500 text-slate-950 font-black'
+                                    : 'bg-slate-800 text-amber-300 hover:bg-slate-700 border border-slate-700'
+                                }`}
+                              >
+                                +{val}
+                              </button>
+                            ))}
+                          </div>
                         </div>
 
                         <label className="flex items-start gap-2 cursor-pointer text-[11px] text-amber-300 bg-amber-500/10 p-2 rounded border border-amber-500/20">
@@ -619,17 +736,37 @@ export const AdminPanel: React.FC = () => {
                       </div>
                     ) : (
                       <div className="flex items-center justify-between pt-2 border-t border-slate-800">
-                        <button
-                          onClick={() => {
-                            setEditingRetoId(r.id);
-                            setEditRetoNombre(r.nombre);
-                            setEditRetoPuntos(r.puntos);
-                            setEditRetoRetroactivo(true);
-                          }}
-                          className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" /> Modificar Valor
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingRetoId(r.id);
+                              setEditRetoNombre(r.nombre);
+                              setEditRetoPuntos(r.puntos);
+                              setEditRetoRetroactivo(true);
+                            }}
+                            className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" /> Modificar
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              if (
+                                window.confirm(
+                                  `¿Estás seguro de eliminar el reto "${r.nombre}"?\n\nSe eliminarán las participaciones y puntos asignados a los ganadores de este reto.`
+                                )
+                              ) {
+                                eliminarReto(r.id);
+                                showFeedback(`Reto "${r.nombre}" eliminado correctamente.`);
+                              }
+                            }}
+                            className="p-1 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-950/40 border border-transparent hover:border-red-900 transition-colors cursor-pointer"
+                            title="Eliminar este reto y sus puntos"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
                         <span className="text-[11px] text-slate-500">
                           {participacionesRetos.filter((p) => p.retoId === r.id && !p.anulado).length} ganadores
                         </span>
@@ -712,35 +849,36 @@ export const AdminPanel: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-slate-400 uppercase font-bold mb-1">
-                      Puntos a Otorgar
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-slate-400 uppercase font-bold">
+                      Puntos a Otorgar (+pts)
                     </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="5"
-                      value={retoPointsToAward}
-                      onChange={(e) => setRetoPointsToAward(Number(e.target.value))}
-                      className="w-full bg-slate-800 text-white p-2 rounded-xl border border-slate-700 font-bold text-amber-300"
-                    />
+                    <span className="text-[10px] text-amber-400 font-bold">Valores altos:</span>
                   </div>
-
-                  <div>
-                    <label className="block text-slate-400 uppercase font-bold mb-1">
-                      Posición
-                    </label>
-                    <select
-                      value={retoPosition}
-                      onChange={(e) => setRetoPosition(Number(e.target.value))}
-                      className="w-full bg-slate-800 text-white p-2 rounded-xl border border-slate-700"
-                    >
-                      <option value={1}>🥇 1er Puesto</option>
-                      <option value={2}>🥈 2do Puesto</option>
-                      <option value={3}>🥉 3er Puesto</option>
-                      <option value={4}>4to Puesto</option>
-                    </select>
+                  <input
+                    type="number"
+                    min="1"
+                    step="5"
+                    value={retoPointsToAward}
+                    onChange={(e) => setRetoPointsToAward(Number(e.target.value))}
+                    className="w-full bg-slate-800 text-white p-2.5 rounded-xl border border-slate-700 font-black text-amber-300 text-sm"
+                  />
+                  <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                    {[50, 100, 150, 200, 300, 500].map((val) => (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setRetoPointsToAward(val)}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
+                          retoPointsToAward === val
+                            ? 'bg-amber-500 text-slate-950 font-black shadow'
+                            : 'bg-slate-800 text-amber-300 hover:bg-slate-700 border border-slate-700'
+                        }`}
+                      >
+                        +{val}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -1455,6 +1593,340 @@ export const AdminPanel: React.FC = () => {
                 </button>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: DETALLE Y RETOS DEL CONECTADO (ConectadoDetalleModal)              */}
+      {/* ========================================================================= */}
+      {selectedConectadoModalId && (
+        <ConectadoDetalleModal
+          eventoId={selectedConectadoModalId}
+          onClose={() => setSelectedConectadoModalId(null)}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: CREAR NUEVO EVENTO / CONECTADO                                     */}
+      {/* ========================================================================= */}
+      {showCreateEventoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl">
+            <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-indigo-400" />
+                Crear Nuevo Evento / Conectado
+              </h3>
+              <button
+                onClick={() => setShowCreateEventoModal(false)}
+                className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newEventoNombre.trim()) return;
+                const nuevoEvento = crearEvento({
+                  nombre: newEventoNombre.trim(),
+                  descripcion: newEventoDesc.trim(),
+                  fecha: newEventoFecha,
+                  tipoEvento: newEventoTipo,
+                  puntosAsistencia: Number(newEventoPuntos),
+                  utilizaQr: newEventoUsaQr,
+                  utilizaTurnos: newEventoUsaTurnos,
+                  temporadaId: temporadaActiva?.id || temporadas[0]?.id || 'temp-2026-1',
+                });
+                setShowCreateEventoModal(false);
+                setNewEventoNombre('');
+                setNewEventoDesc('');
+                showFeedback(`Evento "${nuevoEvento.nombre}" creado exitosamente.`);
+              }}
+              className="p-6 space-y-4 text-xs"
+            >
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">
+                  Nombre del Evento *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: Conectado 4: Alabanza y Adoración"
+                  value={newEventoNombre}
+                  onChange={(e) => setNewEventoNombre(e.target.value)}
+                  className="w-full bg-slate-800 text-white p-2.5 rounded-xl border border-slate-700 focus:border-indigo-500 font-medium"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Fecha del Evento
+                  </label>
+                  <input
+                    type="date"
+                    value={newEventoFecha}
+                    onChange={(e) => setNewEventoFecha(e.target.value)}
+                    className="w-full bg-slate-800 text-white p-2.5 rounded-xl border border-slate-700"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    Tipo de Evento
+                  </label>
+                  <select
+                    value={newEventoTipo}
+                    onChange={(e) => setNewEventoTipo(e.target.value as Evento['tipoEvento'])}
+                    className="w-full bg-slate-800 text-white p-2.5 rounded-xl border border-slate-700"
+                  >
+                    <option value="conectado">Conectado Oficial</option>
+                    <option value="taller">Taller / Especial</option>
+                    <option value="expectativa">Expectativa</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">
+                  Puntos Base por Asistencia
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="5"
+                  value={newEventoPuntos}
+                  onChange={(e) => setNewEventoPuntos(Number(e.target.value))}
+                  className="w-full bg-slate-800 text-amber-300 font-extrabold p-2.5 rounded-xl border border-slate-700"
+                  required
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  * Recuerda que la asistencia real en Conectados se pondera automáticamente por el tamaño del GT (16 / totalIntegrantes).
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">
+                  Descripción (Opcional)
+                </label>
+                <textarea
+                  placeholder="Detalles sobre el evento, dinámica o programa..."
+                  value={newEventoDesc}
+                  onChange={(e) => setNewEventoDesc(e.target.value)}
+                  rows={2}
+                  className="w-full bg-slate-800 text-white p-2.5 rounded-xl border border-slate-700"
+                />
+              </div>
+
+              <div className="flex gap-4 pt-1">
+                <label className="flex items-center gap-2 cursor-pointer text-slate-300 font-medium">
+                  <input
+                    type="checkbox"
+                    checked={newEventoUsaQr}
+                    onChange={(e) => setNewEventoUsaQr(e.target.checked)}
+                    className="rounded bg-slate-800 border-slate-700 text-indigo-500"
+                  />
+                  <span>Permitir escaneo QR</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer text-slate-300 font-medium">
+                  <input
+                    type="checkbox"
+                    checked={newEventoUsaTurnos}
+                    onChange={(e) => setNewEventoUsaTurnos(e.target.checked)}
+                    className="rounded bg-slate-800 border-slate-700 text-indigo-500"
+                  />
+                  <span>Habilitar turnos</span>
+                </label>
+              </div>
+
+              <div className="pt-4 border-t border-slate-800 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateEventoModal(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/30 cursor-pointer"
+                >
+                  Crear Evento
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: CREAR NUEVO RETO CON PUNTOS ALTOS                                   */}
+      {/* ========================================================================= */}
+      {showCreateRetoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl">
+            <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-purple-400" />
+                Crear Nuevo Reto (+pts altos)
+              </h3>
+              <button
+                onClick={() => setShowCreateRetoModal(false)}
+                className="p-1 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newRetoNombre.trim() || !newRetoEventoId) return;
+                const nuevo = crearReto({
+                  eventoId: newRetoEventoId,
+                  temporadaId: temporadaActiva?.id || temporadas[0]?.id || 'temp-2026-1',
+                  nombre: newRetoNombre.trim(),
+                  descripcion: newRetoDesc.trim(),
+                  tipoReto: newRetoTipo,
+                  puntos: Number(newRetoPuntos),
+                });
+                setShowCreateRetoModal(false);
+                setNewRetoNombre('');
+                setNewRetoDesc('');
+                showFeedback(`Reto "${nuevo.nombre}" (+${nuevo.puntos} pts) creado.`);
+              }}
+              className="p-6 space-y-4 text-xs"
+            >
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">
+                  Evento o Conectado al que Pertenece *
+                </label>
+                <select
+                  value={newRetoEventoId}
+                  onChange={(e) => setNewRetoEventoId(e.target.value)}
+                  className="w-full bg-slate-800 text-white p-2.5 rounded-xl border border-slate-700 font-medium"
+                  required
+                >
+                  {eventos.map((ev) => (
+                    <option key={ev.id} value={ev.id}>
+                      {ev.nombre} ({ev.fecha})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">
+                  Nombre del Reto / Desafío *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: Reto de Porras y Coreografía"
+                  value={newRetoNombre}
+                  onChange={(e) => setNewRetoNombre(e.target.value)}
+                  className="w-full bg-slate-800 text-white p-2.5 rounded-xl border border-slate-700 focus:border-purple-500 font-medium"
+                  required
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-slate-300 font-bold">
+                    Puntos que otorga (+pts) *
+                  </label>
+                  <span className="text-[11px] text-amber-400 font-bold">Presets altos:</span>
+                </div>
+                <input
+                  type="number"
+                  min="1"
+                  step="5"
+                  value={newRetoPuntos}
+                  onChange={(e) => setNewRetoPuntos(Number(e.target.value))}
+                  className="w-full bg-slate-800 text-amber-300 font-black text-sm p-2.5 rounded-xl border border-slate-700"
+                  required
+                />
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  {[50, 100, 150, 200, 300, 500].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => setNewRetoPuntos(val)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-black cursor-pointer ${
+                        newRetoPuntos === val
+                          ? 'bg-amber-500 text-slate-950 shadow'
+                          : 'bg-slate-800 text-amber-300 hover:bg-slate-700 border border-slate-700'
+                      }`}
+                    >
+                      +{val} pts
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">
+                  Tipo de Reto
+                </label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer text-slate-300">
+                    <input
+                      type="radio"
+                      name="retoTipo"
+                      value="grupal"
+                      checked={newRetoTipo === 'grupal'}
+                      onChange={() => setNewRetoTipo('grupal')}
+                      className="text-purple-600"
+                    />
+                    <span>Grupal (Puntos para todo el GT)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-slate-300">
+                    <input
+                      type="radio"
+                      name="retoTipo"
+                      value="individual"
+                      checked={newRetoTipo === 'individual'}
+                      onChange={() => setNewRetoTipo('individual')}
+                      className="text-purple-600"
+                    />
+                    <span>Individual (Puntos para un integrante)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">
+                  Descripción / Reglas
+                </label>
+                <textarea
+                  placeholder="Objetivo, dinámica, materiales necesarios..."
+                  value={newRetoDesc}
+                  onChange={(e) => setNewRetoDesc(e.target.value)}
+                  rows={2}
+                  className="w-full bg-slate-800 text-white p-2.5 rounded-xl border border-slate-700"
+                />
+              </div>
+
+              <div className="pt-4 border-t border-slate-800 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateRetoModal(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-lg shadow-purple-600/30 cursor-pointer"
+                >
+                  Crear Reto (+{newRetoPuntos} pts)
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
