@@ -19,13 +19,18 @@ export interface GrupoTrabajo {
   createdAt: string;
 }
 
+export type PersonaTipo = 'GT' | 'MESA' | 'GAP';
+
 export interface Persona {
   id: string;
   nombreCompleto: string;
   gtId: string;
+  tipo: PersonaTipo;
+  temporadaId: string;
   activo: boolean;
   email?: string;
   codigoEstudiantil?: string;
+  turnosMesa?: string[];
   createdAt: string;
 }
 
@@ -72,6 +77,8 @@ export interface Asistencia {
   puntosOtorgados: number;
   fechaRegistro: string;
   origen: 'qr' | 'manual';
+  esTurnoMesa?: boolean; // When true, MESA person on duty -> personal points granted, GT points 0
+  actividadTipo?: string;
   anulado?: boolean;
   anuladoMotivo?: string;
 }
@@ -132,10 +139,15 @@ export interface GtCalculado {
   puntosBrutosAsistencia: number;
   puntosBrutosRetos: number;
   puntosBrutosTotal: number;
-  diasPointsFinal: number;
+  diasPointsTemporada: number; // DIAS Points generated in active season (2026-2)
+  diasPoints2026_1: number; // Historical 2026-1 frozen points
+  diasPointsAcumulado: number; // diasPoints2026_1 + diasPointsTemporada
+  diasPointsFinal: number; // Display points depending on view
   participacionesAsistencia: number;
   retosCompletados: number;
   posicion: number;
+  posicionAcumulado?: number;
+  posicion2026_2?: number;
   posicionAnterior?: number;
 }
 
@@ -148,6 +160,31 @@ export interface PersonaCalculada {
   totalEventos: number;
   posicion: number;
 }
+
+export interface HistoricoGt2026_1 {
+  gtCodigo: string;
+  gtNombre: string;
+  integrantes: number;
+  puntosBrutos: number;
+  factor: number;
+  diasPoints: number;
+}
+
+// Historical frozen results from DIAS LEAGUE 2026-1 (Prompt spec #6)
+export const HISTORIAL_REAL_2026_1: Record<
+  string,
+  { integrantes: number; puntosBrutos: number; factor: number; diasPoints: number }
+> = {
+  GH: { integrantes: 10, puntosBrutos: 250, factor: 1.6, diasPoints: 400 },
+  LOGÍSTICA: { integrantes: 14, puntosBrutos: 360, factor: 1.14, diasPoints: 410.4 },
+  RRPP: { integrantes: 7, puntosBrutos: 130, factor: 2.29, diasPoints: 297.7 },
+  MERCADEO: { integrantes: 10, puntosBrutos: 110, factor: 1.6, diasPoints: 176 },
+  GENERALES: { integrantes: 8, puntosBrutos: 110, factor: 2.0, diasPoints: 220 },
+  'THE GAMES': { integrantes: 8, puntosBrutos: 190, factor: 2.0, diasPoints: 380 },
+  CARNIVAL: { integrantes: 14, puntosBrutos: 230, factor: 1.14, diasPoints: 262.2 },
+  FINANZAS: { integrantes: 6, puntosBrutos: 140, factor: 2.67, diasPoints: 373.8 },
+  SEGURIDAD: { integrantes: 11, puntosBrutos: 380, factor: 1.45, diasPoints: 551 },
+};
 
 export interface RetoDetalleConectado {
   retoId: string;

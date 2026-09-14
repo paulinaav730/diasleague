@@ -147,19 +147,37 @@ interface AppContextType {
     observacion?: string;
   }) => void;
 
-  // Actions - Factores
+  // Actions - Factores & Config
+  factorBase: number;
+  setFactorBase: (base: number) => void;
   actualizarFactor: (id: string, nuevoFactor: number) => void;
   actualizarRangoFactor: (id: string, min: number, max: number | null, factor: number) => void;
 
-  // Actions - Auditoría y Corrección
+  // Ranking view toggle: Total Acumulado vs 2026-2
+  modoRanking: 'acumulado' | 'temporada';
+  setModoRanking: (modo: 'acumulado' | 'temporada') => void;
+
+  // Actions - Auditoría y Corrección de Puntos
+  actualizarAsistencia: (id: string, updates: Partial<Asistencia>) => void;
+  eliminarAsistencia: (id: string) => void;
   anularAsistencia: (id: string, motivo: string) => void;
+  eliminarParticipacionReto: (id: string) => void;
   anularParticipacionReto: (id: string) => void;
 
   // Data reset & test data controls
   restablecerDatosPrueba: () => void;
   limpiarTodosLosDatos: () => void;
   limpiarDatosPrueba: () => Promise<void>;
-  importarPersonasMasivo: (personas: Array<{ nombreCompleto: string; gtId: string }>) => Promise<{ success: boolean; count: number; error?: string }>;
+  importarPersonasMasivo: (personas: Array<{ nombreCompleto: string; gtId: string; tipo?: 'GT' | 'MESA' | 'GAP' }>) => Promise<{ success: boolean; count: number; error?: string }>;
+  registrarPuntosManual: (params: {
+    personaId?: string | null;
+    gtId: string;
+    eventoId: string;
+    puntos: number;
+    tipoPuntos?: string;
+    motivo?: string;
+    esTurnoMesa?: boolean;
+  }) => Promise<{ success: boolean; message: string }>;
   registrarPuntosPersonaManual: (params: {
     personaId: string;
     gtId: string;
@@ -289,6 +307,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [isAdmin, setIsAdmin] = useState<boolean>(true); // Default true for full exploratory access
 
+  const [factorBase, setFactorBaseState] = useState<number>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY + '_factorBase');
+    return saved ? Number(saved) : 16;
+  });
+
+  const [modoRanking, setModoRankingState] = useState<'acumulado' | 'temporada'>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY + '_modoRanking');
+    return saved === 'temporada' || saved === 'acumulado' ? saved : 'acumulado';
+  });
+
+  const setFactorBase = useCallback((base: number) => {
+    setFactorBaseState(base);
+    localStorage.setItem(STORAGE_KEY + '_factorBase', String(base));
+  }, []);
+
+  const setModoRanking = useCallback((modo: 'acumulado' | 'temporada') => {
+    setModoRankingState(modo);
+    localStorage.setItem(STORAGE_KEY + '_modoRanking', modo);
+  }, []);
+
   // Sync to localStorage
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY + '_temporadas', JSON.stringify(temporadas));
@@ -349,9 +387,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       asistencias,
       participacionesRetos,
       factores,
-      temporadaActiva.id
+      temporadaActiva.id,
+      factorBase,
+      modoRanking
     );
-  }, [gts, personas, asistencias, participacionesRetos, factores, temporadaActiva]);
+  }, [gts, personas, asistencias, participacionesRetos, factores, temporadaActiva, factorBase, modoRanking]);
 
   const podio = useMemo(() => {
     // Only show GTs that have points (> 0), up to top 3
@@ -530,6 +570,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             id: 'per-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
             nombreCompleto: nombreCompleto.trim(),
             gtId: gtId,
+            tipo: 'GT',
+            temporadaId: temporadaActiva?.id || 'temp-2026-2',
             activo: true,
             createdAt: new Date().toISOString(),
           };
@@ -1014,6 +1056,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [addAuditLog]
   );
 
+  const actualizarAsistencia = useCallback(
+    (id: string, updates: Partial<Asistencia>) => {
+      setAsistencias((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, ...updates } : a))
+      );
+      addAuditLog(
+        'ACTUALIZAR_ASISTENCIA',
+        'asistencia',
+        id,
+        `Puntos/datos de asistencia modificados: ${JSON.stringify(updates)}`
+      );
+    },
+    [addAuditLog]
+  );
+
+  const eliminarAsistencia = useCallback(
+    (id: string) => {
+      setAsistencias((prev) => prev.filter((a) => a.id !== id));
+      addAuditLog(
+        'ELIMINAR_ASISTENCIA',
+        'asistencia',
+        id,
+        'Registro de asistencia eliminado por el Administrador'
+      );
+    },
+    [addAuditLog]
+  );
+
+  const eliminarParticipacionReto = useCallback(
+    (id: string) => {
+      setParticipacionesRetos((prev) => prev.filter((r) => r.id !== id));
+      addAuditLog(
+        'ELIMINAR_PARTICIPACION_RETO',
+        'participacion_reto',
+        id,
+        'Asignación de puntos de reto eliminada por el Administrador'
+      );
+    },
+    [addAuditLog]
+  );
+
   // Reset to initial test data
   const restablecerDatosPrueba = useCallback(() => {
     setTemporadas(INITIAL_TEMPORADAS);
@@ -1084,12 +1167,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Bulk import persons from validated Excel rows
   const importarPersonasMasivo = useCallback(
-    async (personasAImportar: Array<{ nombreCompleto: string; gtId: string }>) => {
+    async (personasAImportar: Array<{ nombreCompleto: string; gtId: string; tipo?: 'GT' | 'MESA' | 'GAP' }>) => {
       const now = new Date().toISOString();
       const nuevas: Persona[] = personasAImportar.map((p, idx) => ({
         id: `per-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
         nombreCompleto: p.nombreCompleto.trim(),
         gtId: p.gtId,
+        tipo: p.tipo || 'GT',
+        temporadaId: activeTemporadaId || 'temp-2026-2',
+        turnosMesa: [],
         activo: true,
         createdAt: now,
       }));
@@ -1105,6 +1191,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               id: p.id,
               nombre_completo: p.nombreCompleto,
               gt_id: p.gtId,
+              tipo: p.tipo,
               activo: p.activo,
               created_at: p.createdAt,
             }))
@@ -1123,7 +1210,82 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       return { success: true, count: nuevas.length };
     },
-    [addAuditLog]
+    [activeTemporadaId, addAuditLog]
+  );
+
+  // Unified Manual Points Registrar (supports individual, GT direct, MESA duty, penalties)
+  const registrarPuntosManual = useCallback(
+    async (params: {
+      personaId?: string | null;
+      gtId: string;
+      eventoId: string;
+      puntos: number;
+      tipoPuntos?: string;
+      motivo?: string;
+      esTurnoMesa?: boolean;
+    }) => {
+      const targetGt = gts.find((g) => g.id === params.gtId);
+      const targetEvento = eventos.find((e) => e.id === params.eventoId);
+      const targetPersona = params.personaId ? personas.find((p) => p.id === params.personaId) : null;
+      const now = new Date().toISOString();
+      const puntosNum = Number(params.puntos) || 0;
+
+      if (params.personaId) {
+        const nuevaAsistencia: Asistencia = {
+          id: `asist-man-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          personaId: params.personaId,
+          eventoId: params.eventoId,
+          temporadaId: activeTemporadaId,
+          gtId: params.gtId,
+          puntosOtorgados: puntosNum,
+          fechaRegistro: now,
+          origen: 'manual',
+          esTurnoMesa: params.esTurnoMesa || false,
+          anuladoMotivo: params.motivo || params.tipoPuntos,
+        };
+
+        setAsistencias((prev) => [nuevaAsistencia, ...prev]);
+
+        addAuditLog(
+          'REGISTRO_PUNTOS_MANUAL',
+          'asistencia',
+          nuevaAsistencia.id,
+          `${puntosNum >= 0 ? '+' : ''}${puntosNum} pts a ${targetPersona?.nombreCompleto || 'Persona'} (${targetGt?.nombre}) [${params.tipoPuntos || 'Actividad'}] ${params.esTurnoMesa ? '(Turno de Mesa - No suma a GT)' : ''}`
+        );
+
+        return {
+          success: true,
+          message: `Se registraron ${puntosNum} puntos a ${targetPersona?.nombreCompleto || 'la persona'}.`,
+        };
+      } else {
+        const nuevaParticipacion: ParticipacionReto = {
+          id: `pret-man-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          retoId: retos[0]?.id || `reto-manual-${Date.now()}`,
+          eventoId: params.eventoId,
+          temporadaId: activeTemporadaId,
+          gtId: params.gtId,
+          personaId: null,
+          puntosOtorgados: puntosNum,
+          observacion: params.motivo || params.tipoPuntos || 'Puntos directos asignados por Admin',
+          fechaRegistro: now,
+        };
+
+        setParticipacionesRetos((prev) => [nuevaParticipacion, ...prev]);
+
+        addAuditLog(
+          'REGISTRO_PUNTOS_GT',
+          'gt',
+          params.gtId,
+          `${puntosNum >= 0 ? '+' : ''}${puntosNum} pts directos asignados a GT ${targetGt?.nombre} en ${targetEvento?.nombre || 'Evento'} [${params.tipoPuntos || 'Actividad'}]`
+        );
+
+        return {
+          success: true,
+          message: `Se registraron ${puntosNum} puntos al GT ${targetGt?.nombre}.`,
+        };
+      }
+    },
+    [gts, eventos, personas, retos, activeTemporadaId, addAuditLog]
   );
 
   // Register points to a specific person manually
@@ -1293,12 +1455,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       asignarGanadorReto,
       actualizarFactor,
       actualizarRangoFactor,
+      factorBase,
+      setFactorBase,
+      modoRanking,
+      setModoRanking,
+      actualizarAsistencia,
+      eliminarAsistencia,
       anularAsistencia,
+      eliminarParticipacionReto,
       anularParticipacionReto,
       restablecerDatosPrueba,
       limpiarTodosLosDatos,
       limpiarDatosPrueba,
       importarPersonasMasivo,
+      registrarPuntosManual,
       registrarPuntosPersonaManual,
       registrarPuntosGtManual,
       isAdmin,
@@ -1348,12 +1518,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       asignarGanadorReto,
       actualizarFactor,
       actualizarRangoFactor,
+      factorBase,
+      setFactorBase,
+      modoRanking,
+      setModoRanking,
+      actualizarAsistencia,
+      eliminarAsistencia,
       anularAsistencia,
+      eliminarParticipacionReto,
       anularParticipacionReto,
       restablecerDatosPrueba,
       limpiarTodosLosDatos,
       limpiarDatosPrueba,
       importarPersonasMasivo,
+      registrarPuntosManual,
       registrarPuntosPersonaManual,
       registrarPuntosGtManual,
       isAdmin,

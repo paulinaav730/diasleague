@@ -5,50 +5,74 @@ export interface PersonaImportada {
   nombre: string;
   gtNombre: string;
   gtId: string;
+  tipo: 'GT' | 'MESA' | 'GAP';
+  fila?: number;
 }
 
 export interface ExcelValidationResult {
   isValid: boolean;
   errors: string[];
   totalFilas: number;
+  totalNuevas: number;
+  totalDuplicados: number;
+  totalInvalidos: number;
+  totalIncompletos: number;
   personas: PersonaImportada[];
 }
 
 /**
  * Generates and downloads the official DIAS LEAGUE - EXCEL MAESTRO.xlsx template.
- * - Primary sheet "Personas" with only two columns: NOMBRE | GT
- * - Secondary reference sheet "GTs" with available GTs
+ * - Primary sheet "Personas" with only three columns: NOMBRE | GT | TIPO
+ * - Secondary reference sheet "GTs" with available GTs and "TIPOS"
  */
 export function descargarPlantillaExcelMaestro(gts: GrupoTrabajo[]) {
   const wb = XLSX.utils.book_new();
 
-  // Hoja principal: únicamente NOMBRE y GT
-  const wsMain = XLSX.utils.aoa_to_sheet([['NOMBRE', 'GT']]);
-  wsMain['!cols'] = [{ wch: 32 }, { wch: 22 }];
+  // Hoja principal: únicamente NOMBRE, GT y TIPO
+  const wsMainData = [
+    ['NOMBRE', 'GT', 'TIPO'],
+    ['María Pérez', 'RRPP', 'GT'],
+    ['Juan Gómez', 'LOGÍSTICA', 'MESA'],
+    ['Laura Rodríguez', 'GH', 'GAP'],
+  ];
+  const wsMain = XLSX.utils.aoa_to_sheet(wsMainData);
+  wsMain['!cols'] = [{ wch: 32 }, { wch: 22 }, { wch: 16 }];
   XLSX.utils.book_append_sheet(wb, wsMain, 'Personas');
 
   // Hoja secundaria de referencia: GTs disponibles
-  const gtsList = gts && gts.length > 0
-    ? gts
-    : [
-        { nombre: 'GH', codigo: 'GH' },
-        { nombre: 'LOGÍSTICA', codigo: 'LOG' },
-        { nombre: 'RRPP', codigo: 'RRPP' },
-        { nombre: 'MERCADEO', codigo: 'MER' },
-        { nombre: 'GENERALES', codigo: 'GEN' },
-        { nombre: 'THE GAMES', codigo: 'TG' },
-        { nombre: 'CARNIVAL', codigo: 'CARN' },
-        { nombre: 'FINANZAS', codigo: 'FIN' },
-        { nombre: 'SEGURIDAD', codigo: 'SEG' },
-      ];
+  const gtsList =
+    gts && gts.length > 0
+      ? gts
+      : [
+          { nombre: 'GH', codigo: 'GH' },
+          { nombre: 'LOGÍSTICA', codigo: 'LOG' },
+          { nombre: 'RRPP', codigo: 'RRPP' },
+          { nombre: 'MERCADEO', codigo: 'MER' },
+          { nombre: 'GENERALES', codigo: 'GEN' },
+          { nombre: 'THE GAMES', codigo: 'TG' },
+          { nombre: 'CARNIVAL', codigo: 'CARN' },
+          { nombre: 'FINANZAS', codigo: 'FIN' },
+          { nombre: 'SEGURIDAD', codigo: 'SEG' },
+        ];
 
   const gtsData = [
-    ['GT DISPONIBLE', 'CÓDIGO'],
-    ...gtsList.map((g) => [g.nombre, g.codigo]),
+    ['GT DISPONIBLE (9 OFICIALES)', 'CÓDIGO'],
+    ...gtsList.map((g) => [g.nombre.toUpperCase(), g.codigo.toUpperCase()]),
   ];
   const wsGts = XLSX.utils.aoa_to_sheet(gtsData);
-  wsGts['!cols'] = [{ wch: 26 }, { wch: 16 }];
+  wsGts['!cols'] = [{ wch: 32 }, { wch: 16 }];
   XLSX.utils.book_append_sheet(wb, wsGts, 'GTs');
+
+  // Hoja terciaria: Tipos de personas permitidos
+  const tiposData = [
+    ['TIPO PERMITIDO', 'DESCRIPCIÓN'],
+    ['GT', 'Integrante normal de su GT (suma puntos para la persona y para el GT)'],
+    ['MESA', 'Miembro de la mesa directiva (en turno de mesa no suma al GT; como participante sí)'],
+    ['GAP', 'Integrante de apoyo / staff (participa en dinámicas con filtro en reportes)'],
+  ];
+  const wsTipos = XLSX.utils.aoa_to_sheet(tiposData);
+  wsTipos['!cols'] = [{ wch: 20 }, { wch: 70 }];
+  XLSX.utils.book_append_sheet(wb, wsTipos, 'Tipos');
 
   // Descarga del archivo
   XLSX.writeFile(wb, 'DIAS_LEAGUE_EXCEL_MAESTRO.xlsx');
@@ -270,6 +294,10 @@ export async function validarYParsearExcel(
         isValid: false,
         errors: ['El archivo de Excel está vacío o no contiene hojas legibles.'],
         totalFilas: 0,
+        totalNuevas: 0,
+        totalDuplicados: 0,
+        totalInvalidos: 0,
+        totalIncompletos: 0,
         personas: [],
       };
     }
@@ -286,6 +314,10 @@ export async function validarYParsearExcel(
         isValid: false,
         errors: ['El archivo está completamente vacío.'],
         totalFilas: 0,
+        totalNuevas: 0,
+        totalDuplicados: 0,
+        totalInvalidos: 0,
+        totalIncompletos: 0,
         personas: [],
       };
     }
@@ -302,9 +334,14 @@ export async function validarYParsearExcel(
       return clean === 'gt' || clean.includes('grupo') || clean.includes('comite') || clean.includes('equipo');
     });
 
+    let colTipoIdx = headerRow.findIndex((h) => {
+      const clean = normalizeCleanText(h);
+      return clean === 'tipo' || clean.includes('rol') || clean.includes('cargo') || clean.includes('estatus');
+    });
+
     let startRow = 1;
 
-    // Fallback: If no clear headers found, but row 0 looks like data with 2 columns:
+    // Fallback: If no clear headers found, but row 0 looks like data with 2 or 3 columns:
     if (colNombreIdx === -1 || colGtIdx === -1) {
       if (headerRow.length >= 2) {
         const potentialGtCol0 = resolverGtDesdeTexto(headerRow[0], gtsDisponibles);
@@ -313,17 +350,24 @@ export async function validarYParsearExcel(
         if (potentialGtCol1) {
           colNombreIdx = 0;
           colGtIdx = 1;
+          colTipoIdx = headerRow.length >= 3 ? 2 : -1;
           startRow = 0; // The first row was actually data
         } else if (potentialGtCol0) {
           colNombreIdx = 1;
           colGtIdx = 0;
+          colTipoIdx = headerRow.length >= 3 ? 2 : -1;
           startRow = 0;
         } else {
-          // Default fallback to Col 0 = Nombre, Col 1 = GT
+          // Default fallback to Col 0 = Nombre, Col 1 = GT, Col 2 = Tipo
           if (colNombreIdx === -1) colNombreIdx = 0;
           if (colGtIdx === -1) colGtIdx = 1;
+          if (colTipoIdx === -1 && headerRow.length >= 3) colTipoIdx = 2;
         }
       }
+    }
+
+    if (colTipoIdx === -1 && headerRow.length >= 3 && colNombreIdx !== 2 && colGtIdx !== 2) {
+      colTipoIdx = 2;
     }
 
     // Rule 1: Que exista la columna NOMBRE
@@ -341,16 +385,19 @@ export async function validarYParsearExcel(
         isValid: false,
         errors,
         totalFilas: 0,
+        totalNuevas: 0,
+        totalDuplicados: 0,
+        totalInvalidos: 0,
+        totalIncompletos: 0,
         personas: [],
       };
     }
 
     const personasParsed: PersonaImportada[] = [];
     const seenNamesInFile = new Set<string>();
-    let hasMissingName = false;
-    let hasMissingGt = false;
-    let hasDuplicates = false;
-    const invalidGtsSet = new Set<string>();
+    let totalDuplicados = 0;
+    let totalInvalidos = 0;
+    let totalIncompletos = 0;
 
     const existingNamesSet = new Set<string>(
       personasExistentes.map((p) => normalizeCleanText(p.nombreCompleto))
@@ -363,76 +410,81 @@ export async function validarYParsearExcel(
 
       const rawNombre = row[colNombreIdx] != null ? String(row[colNombreIdx]).trim() : '';
       const rawGt = row[colGtIdx] != null ? String(row[colGtIdx]).trim() : '';
+      const rawTipo = colTipoIdx !== -1 && row[colTipoIdx] != null ? String(row[colTipoIdx]).trim().toUpperCase() : 'GT';
 
       // Ignore completely empty trailing rows
-      if (!rawNombre && !rawGt) {
+      if (!rawNombre && !rawGt && (!rawTipo || rawTipo === 'GT')) {
         continue;
       }
 
+      const filaNum = r + 1;
+      let filaValida = true;
+
       // Rule 3: Que no falte el nombre
       if (!rawNombre) {
-        hasMissingName = true;
+        errors.push(`Fila ${filaNum}: El nombre es obligatorio.`);
+        totalIncompletos++;
+        filaValida = false;
       }
 
       // Rule 4: Que no falte el GT
       if (!rawGt) {
-        hasMissingGt = true;
+        errors.push(`Fila ${filaNum}: El GT es obligatorio.`);
+        totalIncompletos++;
+        filaValida = false;
       }
 
-      if (!rawNombre || !rawGt) {
+      // Rule 5: Tipo válido (únicamente GT, MESA, GAP)
+      const cleanTipo = (rawTipo || 'GT').toUpperCase().trim();
+      if (cleanTipo !== 'GT' && cleanTipo !== 'MESA' && cleanTipo !== 'GAP') {
+        errors.push(`Fila ${filaNum}: Tipo "${rawTipo}" no válido. Debe ser GT, MESA o GAP.`);
+        totalInvalidos++;
+        filaValida = false;
+      }
+
+      if (!filaValida) {
         continue;
       }
 
-      // Rule 5: Que el GT exista en la base de datos (con resolución flexible)
+      // Rule 6: Que el GT exista en los 9 GTs oficiales
       const matchedGt = resolverGtDesdeTexto(rawGt, gtsDisponibles);
       if (!matchedGt) {
-        invalidGtsSet.add(rawGt);
+        errors.push(`Fila ${filaNum}: El GT "${rawGt}" no existe. Debe ser uno de los 9 GTs oficiales (ej: MERCADEO, LOGÍSTICA, etc.).`);
+        totalInvalidos++;
+        continue;
       }
 
-      // Rule 6: Que no existan personas duplicadas
+      // Rule 7: Que no existan personas duplicadas
       const normName = normalizeCleanText(rawNombre);
       if (seenNamesInFile.has(normName) || existingNamesSet.has(normName)) {
-        hasDuplicates = true;
+        errors.push(`Fila ${filaNum}: La persona "${rawNombre}" está duplicada.`);
+        totalDuplicados++;
+        continue;
       } else {
         seenNamesInFile.add(normName);
       }
 
-      if (matchedGt) {
-        personasParsed.push({
-          nombre: rawNombre,
-          gtNombre: matchedGt.nombre.toUpperCase(),
-          gtId: matchedGt.id,
-        });
-      }
-    }
-
-    // Construct precise required error messages from prompt:
-    if (invalidGtsSet.size > 0) {
-      invalidGtsSet.forEach((invalidGt) => {
-        errors.push(`El GT ${invalidGt} no existe. Revisa el archivo antes de continuar.`);
+      personasParsed.push({
+        nombre: rawNombre,
+        gtNombre: matchedGt.nombre.toUpperCase(),
+        gtId: matchedGt.id,
+        tipo: (cleanTipo as 'GT' | 'MESA' | 'GAP') || 'GT',
+        fila: filaNum,
       });
     }
 
-    if (hasMissingName) {
-      errors.push('Hay personas sin nombre.');
-    }
-
-    if (hasMissingGt) {
-      errors.push('Hay personas sin GT.');
-    }
-
-    if (hasDuplicates) {
-      errors.push('Se encontraron personas duplicadas.');
-    }
-
     if (personasParsed.length === 0 && errors.length === 0) {
-      errors.push('El archivo no contiene filas de personas para importar.');
+      errors.push('El archivo no contiene filas de personas válidas para importar.');
     }
 
     return {
       isValid: errors.length === 0,
       errors,
-      totalFilas: personasParsed.length,
+      totalFilas: rawData.length - startRow,
+      totalNuevas: personasParsed.length,
+      totalDuplicados,
+      totalInvalidos,
+      totalIncompletos,
       personas: personasParsed,
     };
   } catch (err: any) {
@@ -440,6 +492,10 @@ export async function validarYParsearExcel(
       isValid: false,
       errors: [`Error al procesar el archivo Excel: ${err?.message || 'Formato no soportado'}`],
       totalFilas: 0,
+      totalNuevas: 0,
+      totalDuplicados: 0,
+      totalInvalidos: 0,
+      totalIncompletos: 0,
       personas: [],
     };
   }

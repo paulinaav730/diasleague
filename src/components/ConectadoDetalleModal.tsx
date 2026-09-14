@@ -50,6 +50,9 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
     actualizarParticipacionReto,
     asignarGanadorReto,
     anularAsistencia,
+    actualizarAsistencia,
+    eliminarAsistencia,
+    eliminarParticipacionReto,
     registrarAsistencia,
     temporadaActiva,
   } = useApp();
@@ -67,6 +70,8 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
   const [editFecha, setEditFecha] = useState(evento?.fecha || '');
   const [editLugar, setEditLugar] = useState(evento?.lugar || '');
   const [editPuntos, setEditPuntos] = useState(evento?.puntosAsistencia ?? 10);
+  const [editRetroactivo, setEditRetroactivo] = useState(true);
+  const [editSuccessMsg, setEditSuccessMsg] = useState<string | null>(null);
   const [editEstado, setEditEstado] = useState<Evento['estado']>(
     evento?.estado || 'programado'
   );
@@ -79,6 +84,19 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
   const [newRetoDesc, setNewRetoDesc] = useState('');
   const [newRetoPuntos, setNewRetoPuntos] = useState(25);
   const [newRetoTipo, setNewRetoTipo] = useState<'grupal' | 'individual'>('grupal');
+
+  // Edit Reto Form State
+  const [editingRetoId, setEditingRetoId] = useState<string | null>(null);
+  const [editRetoNombre, setEditRetoNombre] = useState('');
+  const [editRetoDesc, setEditRetoDesc] = useState('');
+  const [editRetoPuntos, setEditRetoPuntos] = useState(25);
+  const [editRetoRetroactivo, setEditRetoRetroactivo] = useState(true);
+
+  // Edit Individual Attendance / Reto Participation State
+  const [editingAsistId, setEditingAsistId] = useState<string | null>(null);
+  const [editingAsistPuntos, setEditingAsistPuntos] = useState<number>(10);
+  const [editingPartId, setEditingPartId] = useState<string | null>(null);
+  const [editingPartPuntos, setEditingPartPuntos] = useState<number>(25);
 
   // Assign Winner Form State
   const [assigningRetoId, setAssigningRetoId] = useState<string | null>(null);
@@ -120,18 +138,25 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
 
   const handleSaveEdit = (e: React.FormEvent) => {
     e.preventDefault();
-    actualizarEvento(evento.id, {
-      nombre: editNombre.trim(),
-      descripcion: editDesc.trim(),
-      fecha: editFecha,
-      lugar: editLugar.trim(),
-      puntosAsistencia: Number(editPuntos),
-      estado: editEstado,
-      utilizaQr: editUsaQr,
-      utilizaTurnos: editUsaTurnos,
-      tieneRetos: true,
-    });
-    alert('¡Conectado actualizado con éxito!');
+    actualizarEvento(
+      evento.id,
+      {
+        nombre: editNombre.trim(),
+        descripcion: editDesc.trim(),
+        fecha: editFecha,
+        lugar: editLugar.trim(),
+        puntosAsistencia: Number(editPuntos),
+        estado: editEstado,
+        utilizaQr: editUsaQr,
+        utilizaTurnos: editUsaTurnos,
+        tieneRetos: true,
+      },
+      editRetroactivo
+    );
+    setEditSuccessMsg(
+      `¡Conectado actualizado con éxito! ${editRetroactivo ? `(Valor de +${editPuntos} pts aplicado retroactivamente a todas las asistencias registradas)` : ''}`
+    );
+    setTimeout(() => setEditSuccessMsg(null), 4000);
   };
 
   const handleDeleteEvento = () => {
@@ -636,6 +661,21 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => {
+                                setEditingRetoId(reto.id);
+                                setEditRetoNombre(reto.nombre);
+                                setEditRetoDesc(reto.descripcion || '');
+                                setEditRetoPuntos(reto.puntos);
+                                setEditRetoRetroactivo(true);
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 shadow"
+                              title="Modificar valor de puntos y reglas de este reto"
+                            >
+                              <Pencil className="w-3.5 h-3.5 text-amber-400" />
+                              Modificar Valor
+                            </button>
+
+                            <button
+                              onClick={() => {
                                 setAssigningRetoId(reto.id);
                                 setWinnerPuntos(reto.puntos);
                               }}
@@ -658,6 +698,100 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
                             </button>
                           </div>
                         </div>
+
+                        {/* Inline Edit Reto Form */}
+                        {editingRetoId === reto.id && (
+                          <form
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              actualizarReto(
+                                reto.id,
+                                {
+                                  nombre: editRetoNombre.trim(),
+                                  descripcion: editRetoDesc.trim(),
+                                  puntos: Number(editRetoPuntos),
+                                },
+                                editRetoRetroactivo
+                              );
+                              setEditingRetoId(null);
+                            }}
+                            className="p-4 bg-slate-900/90 border border-purple-500/50 rounded-xl space-y-3 animate-fade-in"
+                          >
+                            <h5 className="font-bold text-xs text-purple-300 flex items-center gap-1.5">
+                              <Pencil className="w-3.5 h-3.5 text-amber-400" /> Modificar Valores y Puntos del Reto
+                            </h5>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-[11px] text-slate-400 font-bold mb-1">
+                                  Nombre del Reto
+                                </label>
+                                <input
+                                  type="text"
+                                  value={editRetoNombre}
+                                  onChange={(e) => setEditRetoNombre(e.target.value)}
+                                  className="w-full bg-slate-800 text-white text-xs p-2 rounded-lg border border-slate-700"
+                                  required
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] text-slate-400 font-bold mb-1">
+                                  Puntos que otorga (+pts)
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="300"
+                                  value={editRetoPuntos}
+                                  onChange={(e) => setEditRetoPuntos(Number(e.target.value))}
+                                  className="w-full bg-slate-800 text-amber-400 font-extrabold text-xs p-2 rounded-lg border border-slate-700"
+                                  required
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] text-slate-400 font-bold mb-1">
+                                Descripción / Dinámica
+                              </label>
+                              <textarea
+                                rows={2}
+                                value={editRetoDesc}
+                                onChange={(e) => setEditRetoDesc(e.target.value)}
+                                className="w-full bg-slate-800 text-white text-xs p-2 rounded-lg border border-slate-700"
+                              />
+                            </div>
+
+                            <label className="flex items-center gap-2 cursor-pointer text-xs text-amber-300 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/30">
+                              <input
+                                type="checkbox"
+                                checked={editRetoRetroactivo}
+                                onChange={(e) => setEditRetoRetroactivo(e.target.checked)}
+                                className="rounded bg-slate-800 border-amber-400 text-amber-500 focus:ring-amber-500"
+                              />
+                              <span>
+                                <strong>Actualizar retroactivamente:</strong> Aplicar el nuevo valor de {editRetoPuntos} pts a los GTs ya registrados como ganadores en este reto.
+                              </span>
+                            </label>
+
+                            <div className="flex items-center justify-end gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={() => setEditingRetoId(null)}
+                                className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-bold"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                type="submit"
+                                className="px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-black text-xs shadow"
+                              >
+                                Guardar Valor del Reto
+                              </button>
+                            </div>
+                          </form>
+                        )}
 
                         {/* Assign Winner Inline Form */}
                         {assigningRetoId === reto.id && (
@@ -739,17 +873,74 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
                             </span>
                             {participaciones.map((pr) => {
                               const gt = gts.find((g) => g.id === pr.gtId);
+                              const isEditingThisPart = editingPartId === pr.id;
+
+                              if (isEditingThisPart) {
+                                return (
+                                  <div
+                                    key={pr.id}
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-slate-900 border border-amber-500/60"
+                                  >
+                                    <span className="font-bold text-white">{gt?.nombre}:</span>
+                                    <input
+                                      type="number"
+                                      className="w-16 bg-slate-800 text-amber-400 px-1.5 py-0.5 rounded border border-slate-600 font-bold text-xs"
+                                      value={editingPartPuntos}
+                                      onChange={(e) => setEditingPartPuntos(Number(e.target.value))}
+                                    />
+                                    <button
+                                      onClick={() => {
+                                        actualizarParticipacionReto(pr.id, {
+                                          puntosOtorgados: Number(editingPartPuntos),
+                                        });
+                                        setEditingPartId(null);
+                                      }}
+                                      className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold text-[11px]"
+                                    >
+                                      ✓
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingPartId(null)}
+                                      className="px-1.5 py-0.5 bg-slate-700 text-slate-300 rounded text-[11px]"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                );
+                              }
+
                               return (
                                 <span
                                   key={pr.id}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-slate-900 border border-slate-700 text-white font-bold"
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-slate-900 border border-slate-700 text-white font-bold group"
                                 >
                                   <Award className="w-3.5 h-3.5 text-amber-400" />
                                   <span>{gt?.nombre}</span>
-                                  <span className="text-amber-400">+{pr.puntosOtorgados} pts</span>
+                                  <span className="text-amber-400 font-black">+{pr.puntosOtorgados} pts</span>
                                   <span className="text-slate-500 text-[10px]">
                                     (#{pr.posicion || 1})
                                   </span>
+                                  <button
+                                    onClick={() => {
+                                      setEditingPartId(pr.id);
+                                      setEditingPartPuntos(pr.puntosOtorgados);
+                                    }}
+                                    className="text-slate-400 hover:text-amber-300 text-[10px] ml-1 opacity-60 group-hover:opacity-100"
+                                    title="Modificar puntos de este ganador"
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (window.confirm(`¿Eliminar puntos de ${gt?.nombre} en este reto?`)) {
+                                        eliminarParticipacionReto(pr.id);
+                                      }
+                                    }}
+                                    className="text-slate-500 hover:text-red-400 text-[10px] ml-0.5 opacity-60 group-hover:opacity-100"
+                                    title="Eliminar asignación de puntos"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
                                 </span>
                               );
                             })}
@@ -818,17 +1009,28 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
 
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1">
-                    Puntos por Asistencia
+                    Puntos por Asistencia (+pts)
                   </label>
                   <input
                     type="number"
                     min="0"
-                    max="100"
+                    max="200"
                     value={editPuntos}
                     onChange={(e) => setEditPuntos(Number(e.target.value))}
-                    className="w-full bg-slate-800 text-white px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs font-bold"
+                    className="w-full bg-slate-800 text-amber-400 font-extrabold px-3.5 py-2.5 rounded-xl border border-slate-700 text-xs"
                     required
                   />
+                  <label className="flex items-start gap-2 mt-2 cursor-pointer text-[11px] text-amber-300 bg-amber-500/10 p-2 rounded-lg border border-amber-500/30">
+                    <input
+                      type="checkbox"
+                      checked={editRetroactivo}
+                      onChange={(e) => setEditRetroactivo(e.target.checked)}
+                      className="rounded bg-slate-800 border-amber-400 text-amber-500 focus:ring-amber-500 mt-0.5"
+                    />
+                    <span>
+                      <strong>Recalcular retroactivo:</strong> Aplicar el nuevo valor de {editPuntos} pts a todas las asistencias ya registradas en este evento.
+                    </span>
+                  </label>
                 </div>
 
                 <div>
@@ -848,6 +1050,13 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
                   </select>
                 </div>
               </div>
+
+              {editSuccessMsg && (
+                <div className="p-3 bg-emerald-950/70 border border-emerald-500/50 text-emerald-300 text-xs rounded-xl flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{editSuccessMsg}</span>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1">
@@ -990,18 +1199,58 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-3">
-                            <span className="text-emerald-400 font-bold">
-                              +{asist.puntosOtorgados} pts
-                            </span>
+                          <div className="flex items-center gap-2">
+                            {editingAsistId === asist.id ? (
+                              <div className="flex items-center gap-1.5 bg-slate-900 px-2 py-1 rounded-lg border border-amber-500/50">
+                                <input
+                                  type="number"
+                                  className="w-16 bg-slate-800 text-amber-400 font-bold px-1.5 py-0.5 rounded text-xs border border-slate-700"
+                                  value={editingAsistPuntos}
+                                  onChange={(e) => setEditingAsistPuntos(Number(e.target.value))}
+                                />
+                                <button
+                                  onClick={() => {
+                                    actualizarAsistencia(asist.id, {
+                                      puntosOtorgados: Number(editingAsistPuntos),
+                                    });
+                                    setEditingAsistId(null);
+                                  }}
+                                  className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold text-[11px]"
+                                >
+                                  ✓
+                                </button>
+                                <button
+                                  onClick={() => setEditingAsistId(null)}
+                                  className="px-1.5 py-0.5 bg-slate-700 text-slate-300 rounded text-[11px]"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <span className="text-emerald-400 font-bold">
+                                  +{asist.puntosOtorgados} pts
+                                </span>
+                                <button
+                                  onClick={() => {
+                                    setEditingAsistId(asist.id);
+                                    setEditingAsistPuntos(asist.puntosOtorgados);
+                                  }}
+                                  className="text-slate-400 hover:text-amber-300 text-xs p-1"
+                                  title="Editar puntos de esta asistencia"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
                             <button
                               onClick={() => {
-                                if (window.confirm('¿Anular esta asistencia?')) {
-                                  anularAsistencia(asist.id, 'Anulado desde gestión del Conectado');
+                                if (window.confirm('¿Eliminar definitivamente este registro de asistencia?')) {
+                                  eliminarAsistencia(asist.id);
                                 }
                               }}
                               className="text-slate-500 hover:text-red-400 text-xs p-1"
-                              title="Anular asistencia"
+                              title="Eliminar asistencia"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>

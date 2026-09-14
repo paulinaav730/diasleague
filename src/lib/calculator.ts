@@ -10,51 +10,92 @@ import {
   PersonaCalculada,
   ResultadoConectadoGt,
   RetoDetalleConectado,
+  HISTORIAL_REAL_2026_1,
 } from '../types';
 
 /**
  * Calculates the size factor based on the active member count of the GT.
- * Default rules:
- * 1 to 5 members  -> 1.3
- * 6 to 10 members -> 1.1
- * 11+ members     -> 1.0
+ * Formula (Spec 23): FACTOR BASE / CANTIDAD DE INTEGRANTES DEL GT (2026-2)
+ * Default FACTOR BASE = 16
+ *
+ * Examples:
+ * 10 integrantes: 16 / 10 = 1.6
+ * 14 integrantes: 16 / 14 = 1.14
+ * 7 integrantes:  16 / 7  = 2.29
+ * 8 integrantes:  16 / 8  = 2.0
+ * 6 integrantes:  16 / 6  = 2.67
+ * 11 integrantes: 16 / 11 = 1.45
+ */
+export function calcularFactorTamano(
+  integrantes: number,
+  factorBase: number = 16
+): number {
+  if (integrantes <= 0) {
+    return Math.round((factorBase / 10) * 100) / 100;
+  }
+  const raw = factorBase / integrantes;
+  return Math.round(raw * 100) / 100;
+}
+
+/**
+ * Backward compatibility wrapper for getFactorForIntegrantes
  */
 export function getFactorForIntegrantes(
   count: number,
-  factores: FactorTamanoRango[]
+  factores?: FactorTamanoRango[],
+  factorBase: number = 16
 ): number {
-  if (count <= 0) return 1.0;
-  
-  // Sort factors to evaluate ranges accurately
-  const sorted = [...factores].sort((a, b) => a.minIntegrantes - b.minIntegrantes);
-  
-  for (const rango of sorted) {
-    if (count >= rango.minIntegrantes) {
-      if (rango.maxIntegrantes === null || count <= rango.maxIntegrantes) {
-        return rango.factor;
-      }
+  return calcularFactorTamano(count, factorBase);
+}
+
+/**
+ * Normalizes GT code or name to match HISTORIAL_REAL_2026_1 keys
+ */
+export function resolverHistorico2026_1(gt: GrupoTrabajo) {
+  const normName = gt.nombre
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .trim();
+  const normCode = gt.codigo.toUpperCase().trim();
+
+  for (const [key, data] of Object.entries(HISTORIAL_REAL_2026_1)) {
+    const normKey = key
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase()
+      .trim();
+    if (
+      normKey === normName ||
+      normKey === normCode ||
+      (normKey === 'LOGISTICA' && (normName.includes('LOGISTICA') || normCode === 'LOG')) ||
+      (normKey === 'MERCADEO' && (normName.includes('MERCADEO') || normCode === 'MER' || normName.includes('PUBLICIDAD'))) ||
+      (normKey === 'THE GAMES' && (normName.includes('GAMES') || normCode === 'TG')) ||
+      (normKey === 'GENERALES' && (normName.includes('GENERAL') || normCode === 'GEN'))
+    ) {
+      return data;
     }
   }
-  
-  // Fallback defaults
-  if (count <= 5) return 1.3;
-  if (count <= 10) return 1.1;
-  return 1.0;
+
+  return { integrantes: 10, puntosBrutos: 0, factor: 1.6, diasPoints: 0 };
 }
 
 /**
  * Calculates GT rankings based on all verified attendances and challenges in the given season.
  * Formula:
- * PUNTOS BRUTOS = Sum of individual attendance points for this GT + Sum of GT challenge points
- * DIAS POINTS = PUNTOS BRUTOS * FACTOR DE TAMAÑO (rounded to 1 decimal)
+ * PUNTOS BRUTOS = Sum of individual attendance points for this GT (excluding MESA in duty) + Sum of GT challenge points
+ * DIAS POINTS 2026-2 = PUNTOS BRUTOS * FACTOR DE TAMAÑO (16 / integrantes)
+ * DIAS POINTS ACUMULADO = DIAS POINTS 2026-1 + DIAS POINTS 2026-2
  */
 export function calcularRankingGts(
   gts: GrupoTrabajo[],
   personas: Persona[],
   asistencias: Asistencia[],
   participacionesRetos: ParticipacionReto[],
-  factores: FactorTamanoRango[],
-  temporadaId: string
+  factores: FactorTamanoRango[] | undefined,
+  temporadaId: string,
+  factorBase: number = 16,
+  modoRanking: 'acumulado' | 'temporada' = 'acumulado'
 ): GtCalculado[] {
   // Filter active asistencias and retos for this season
   const seasonAsistencias = asistencias.filter(
@@ -64,16 +105,18 @@ export function calcularRankingGts(
     (r) => r.temporadaId === temporadaId && !r.anulado
   );
 
-  const results: GtCalculado[] = gts.map((gt) => {
-    // Count active members in this GT
+  const rawResults = gts.map((gt) => {
+    // Count active members in this GT in 2026-2
     const activeMembers = personas.filter((p) => p.gtId === gt.id && p.activo);
     const totalIntegrantes = activeMembers.length;
 
-    // Size Factor
-    const factorTamano = getFactorForIntegrantes(totalIntegrantes, factores);
+    // Size Factor: 16 / totalIntegrantes
+    const factorTamano = calcularFactorTamano(totalIntegrantes, factorBase);
 
-    // Points from attendance
-    const gtAsistencias = seasonAsistencias.filter((a) => a.gtId === gt.id);
+    // Points from attendance (Rule 10: If persona is MESA and currently on mesa duty, does NOT sum to GT)
+    const gtAsistencias = seasonAsistencias.filter(
+      (a) => a.gtId === gt.id && !a.esTurnoMesa
+    );
     const puntosBrutosAsistencia = gtAsistencias.reduce(
       (sum, a) => sum + (a.puntosOtorgados || 0),
       0
@@ -86,13 +129,23 @@ export function calcularRankingGts(
       0
     );
 
-    // Gross points
+    // Gross points 2026-2
     const puntosBrutosTotal = puntosBrutosAsistencia + puntosBrutosRetos;
 
-    // DIAS Points calculation: PUNTOS BRUTOS * FACTOR
-    // Round to 1 decimal place for clean display
+    // 2026-2 DIAS Points calculation: PUNTOS BRUTOS * FACTOR
     const rawDiasPoints = puntosBrutosTotal * factorTamano;
-    const diasPointsFinal = Math.round(rawDiasPoints * 10) / 10;
+    const diasPointsTemporada = Math.round(rawDiasPoints * 100) / 100;
+
+    // 2026-1 Historical frozen points
+    const hist = resolverHistorico2026_1(gt);
+    const diasPoints2026_1 = hist ? hist.diasPoints : 0;
+
+    // Total Acumulado = 2026-1 + 2026-2
+    const diasPointsAcumulado =
+      Math.round((diasPoints2026_1 + diasPointsTemporada) * 100) / 100;
+
+    const diasPointsFinal =
+      modoRanking === 'temporada' ? diasPointsTemporada : diasPointsAcumulado;
 
     return {
       gt,
@@ -101,30 +154,54 @@ export function calcularRankingGts(
       puntosBrutosAsistencia,
       puntosBrutosRetos,
       puntosBrutosTotal,
+      diasPointsTemporada,
+      diasPoints2026_1,
+      diasPointsAcumulado,
       diasPointsFinal,
       participacionesAsistencia: gtAsistencias.length,
       retosCompletados: gtRetos.length,
-      posicion: 0, // Assigned below after sorting
+      posicion: 0,
+      posicionAcumulado: 0,
+      posicion2026_2: 0,
     };
   });
 
-  // Sort descending by DIAS Points. If tied, sort by gross points, then name.
-  results.sort((a, b) => {
-    if (b.diasPointsFinal !== a.diasPointsFinal) {
-      return b.diasPointsFinal - a.diasPointsFinal;
+  // Calculate Acumulado positions
+  const sortedByAcumulado = [...rawResults].sort((a, b) => {
+    if (b.diasPointsAcumulado !== a.diasPointsAcumulado) {
+      return b.diasPointsAcumulado - a.diasPointsAcumulado;
     }
     if (b.puntosBrutosTotal !== a.puntosBrutosTotal) {
       return b.puntosBrutosTotal - a.puntosBrutosTotal;
     }
     return a.gt.nombre.localeCompare(b.gt.nombre);
   });
+  sortedByAcumulado.forEach((item, index) => {
+    item.posicionAcumulado = index + 1;
+  });
 
-  // Assign 1-indexed position
-  results.forEach((item, index) => {
+  // Calculate 2026-2 positions
+  const sortedBy2026_2 = [...rawResults].sort((a, b) => {
+    if (b.diasPointsTemporada !== a.diasPointsTemporada) {
+      return b.diasPointsTemporada - a.diasPointsTemporada;
+    }
+    if (b.puntosBrutosTotal !== a.puntosBrutosTotal) {
+      return b.puntosBrutosTotal - a.puntosBrutosTotal;
+    }
+    return a.gt.nombre.localeCompare(b.gt.nombre);
+  });
+  sortedBy2026_2.forEach((item, index) => {
+    item.posicion2026_2 = index + 1;
+  });
+
+  // Final list sorted based on active ranking mode
+  const finalResults = modoRanking === 'temporada' ? sortedBy2026_2 : sortedByAcumulado;
+
+  finalResults.forEach((item, index) => {
     item.posicion = index + 1;
   });
 
-  return results;
+  return finalResults;
 }
 
 /**

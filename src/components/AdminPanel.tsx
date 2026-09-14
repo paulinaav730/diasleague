@@ -73,6 +73,10 @@ export const AdminPanel: React.FC = () => {
     activarTurno,
     cerrarTurno,
     crearReto,
+    actualizarReto,
+    eliminarReto,
+    actualizarParticipacionReto,
+    eliminarParticipacionReto,
     asignarGanadorReto,
     actualizarFactor,
     actualizarRangoFactor,
@@ -84,6 +88,16 @@ export const AdminPanel: React.FC = () => {
   } = useApp();
 
   const [activeAdminTab, setActiveAdminTab] = useState<AdminTab>('importar_personas');
+
+  // Reto editing state
+  const [editingRetoId, setEditingRetoId] = useState<string | null>(null);
+  const [editRetoNombre, setEditRetoNombre] = useState('');
+  const [editRetoPuntos, setEditRetoPuntos] = useState(25);
+  const [editRetoRetroactivo, setEditRetoRetroactivo] = useState(true);
+
+  // Participation points editing state
+  const [editingPrId, setEditingPrId] = useState<string | null>(null);
+  const [editPrPuntos, setEditPrPuntos] = useState<number>(25);
 
   // Season creation state
   const [newTempName, setNewTempName] = useState('');
@@ -354,21 +368,36 @@ export const AdminPanel: React.FC = () => {
                       </div>
 
                       {/* State and Points changer */}
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 text-xs text-slate-300 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
-                          <span>Puntos:</span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-300 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
+                          <span className="font-semibold text-slate-300">Puntos Asist:</span>
                           <input
                             type="number"
                             min="0"
                             step="5"
                             value={e.puntosAsistencia}
-                            onChange={(ev) =>
+                            onChange={(ev) => {
+                              const newVal = Number(ev.target.value);
                               actualizarEvento(e.id, {
-                                puntosAsistencia: Number(ev.target.value),
-                              })
-                            }
-                            className="w-16 bg-slate-900 text-amber-300 font-bold px-1.5 py-0.5 rounded border border-slate-700 text-right"
+                                puntosAsistencia: newVal,
+                              });
+                            }}
+                            className="w-16 bg-slate-900 text-amber-300 font-extrabold px-1.5 py-0.5 rounded border border-slate-700 text-right"
                           />
+                          <button
+                            onClick={() => {
+                              actualizarEvento(
+                                e.id,
+                                { puntosAsistencia: Number(e.puntosAsistencia) },
+                                true
+                              );
+                              showFeedback(`Puntos de ${e.nombre} recalculados retroactivamente en todas sus asistencias.`);
+                            }}
+                            className="text-[10px] px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 font-bold"
+                            title="Actualizar y recalcular el nuevo puntaje para todas las asistencias históricas ya registradas en este evento"
+                          >
+                            Recalcular Todas
+                          </button>
                         </div>
 
                         <select
@@ -482,194 +511,375 @@ export const AdminPanel: React.FC = () => {
       {/* TAB: RETOS & DESAFÍOS                                                     */}
       {/* ========================================================================= */}
       {activeAdminTab === 'retos' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Award points to winner */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl lg:col-span-1 space-y-4">
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              Asignar Puntos de Reto
-            </h3>
-
-            <div className="space-y-3 text-xs">
+        <div className="space-y-6">
+          {/* Section: Catálogo y Edición de Valores de Retos */}
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <label className="block text-slate-400 uppercase font-bold mb-1">
-                  Reto
-                </label>
-                <select
-                  value={selectedRetoId}
-                  onChange={(e) => setSelectedRetoId(e.target.value)}
-                  className="w-full bg-slate-800 text-white p-2.5 rounded-xl border border-slate-700"
-                >
-                  {retos.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.nombre} (+{r.puntos} pts)
-                    </option>
-                  ))}
-                </select>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Award className="w-5 h-5 text-amber-400" />
+                  Catálogo de Retos y Modificación de Valores
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Modifica el valor en puntos de los retos y decide si deseas recalcular retroactivamente a los ganadores ya registrados.
+                </p>
               </div>
-
-              <div>
-                <label className="block text-slate-400 uppercase font-bold mb-1">
-                  Grupo de Trabajo Ganador (GT)
-                </label>
-                <select
-                  value={selectedGtId}
-                  onChange={(e) => {
-                    setSelectedGtId(e.target.value);
-                    setSelectedPersonaId('');
-                  }}
-                  className="w-full bg-slate-800 text-white p-2.5 rounded-xl border border-slate-700"
-                >
-                  {gts.map((gt) => (
-                    <option key={gt.id} value={gt.id}>
-                      {gt.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-400 uppercase font-bold mb-1">
-                  Integrante Específico (Opcional)
-                </label>
-                <select
-                  value={selectedPersonaId}
-                  onChange={(e) => setSelectedPersonaId(e.target.value)}
-                  className="w-full bg-slate-800 text-white p-2.5 rounded-xl border border-slate-700"
-                >
-                  <option value="">Todo el GT (Reto Grupal)</option>
-                  {personas
-                    .filter((p) => p.gtId === selectedGtId && p.activo)
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.nombreCompleto}
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-slate-400 uppercase font-bold mb-1">
-                    Puntos a Otorgar
-                  </label>
-                  <input
-                    type="number"
-                    min="5"
-                    step="5"
-                    value={retoPointsToAward}
-                    onChange={(e) => setRetoPointsToAward(Number(e.target.value))}
-                    className="w-full bg-slate-800 text-white p-2 rounded-xl border border-slate-700 font-bold text-amber-300"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-400 uppercase font-bold mb-1">
-                    Posición
-                  </label>
-                  <select
-                    value={retoPosition}
-                    onChange={(e) => setRetoPosition(Number(e.target.value))}
-                    className="w-full bg-slate-800 text-white p-2 rounded-xl border border-slate-700"
-                  >
-                    <option value={1}>🥇 1er Puesto</option>
-                    <option value={2}>🥈 2do Puesto</option>
-                    <option value={3}>🥉 3er Puesto</option>
-                    <option value={4}>4to Puesto</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-slate-400 uppercase font-bold mb-1">
-                  Observación
-                </label>
-                <input
-                  type="text"
-                  value={retoObs}
-                  onChange={(e) => setRetoObs(e.target.value)}
-                  placeholder="Detalle o justificación..."
-                  className="w-full bg-slate-800 text-white p-2 rounded-xl border border-slate-700"
-                />
-              </div>
-
-              <button
-                onClick={() => {
-                  asignarGanadorReto({
-                    retoId: selectedRetoId,
-                    gtId: selectedGtId,
-                    personaId: selectedPersonaId || null,
-                    puntos: Number(retoPointsToAward),
-                    posicion: retoPosition,
-                    observacion: retoObs,
-                  });
-                  showFeedback('¡Puntos de reto asignados exitosamente!');
-                }}
-                className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20"
-              >
-                Otorgar Puntos de Reto
-              </button>
             </div>
-          </div>
 
-          {/* List of challenges and awarded points */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl lg:col-span-2">
-            <h3 className="text-base font-bold text-white mb-4">
-              Historial de Retos Otorgados
-            </h3>
-
-            <div className="space-y-2">
-              {participacionesRetos.map((pr) => {
-                const reto = retos.find((r) => r.id === pr.retoId);
-                const gt = gts.find((g) => g.id === pr.gtId);
-                const persona = pr.personaId
-                  ? personas.find((p) => p.id === pr.personaId)
-                  : null;
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
+              {retos.map((r) => {
+                const eventoRel = eventos.find((e) => e.id === r.eventoId);
+                const isEditing = editingRetoId === r.id;
 
                 return (
                   <div
-                    key={pr.id}
-                    className={`p-3 rounded-2xl border text-xs flex items-center justify-between ${
-                      pr.anulado
-                        ? 'bg-slate-800/30 border-slate-800 opacity-50 line-through'
-                        : 'bg-slate-800/60 border-slate-700'
-                    }`}
+                    key={r.id}
+                    className="p-4 rounded-2xl bg-slate-850 border border-slate-800 flex flex-col justify-between gap-3"
                   >
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-amber-300">
-                          {reto?.nombre || 'Reto'}
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <span className="text-[11px] font-bold text-slate-400 truncate">
+                          {eventoRel?.nombre || 'Evento'}
                         </span>
-                        <span className="text-slate-400">• Puesto #{pr.posicion}</span>
+                        <span className="text-xs font-black text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md">
+                          +{r.puntos} pts
+                        </span>
                       </div>
-                      <span className="text-slate-300">
-                        Otorgado a: <strong className="text-white">{gt?.nombre}</strong>{' '}
-                        {persona ? `(${persona.nombreCompleto})` : '(Grupal)'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <span className="text-amber-400 font-bold text-sm">
-                        +{pr.puntosOtorgados} pts
-                      </span>
-                      {!pr.anulado && (
-                        <button
-                          onClick={() => {
-                            if (window.confirm('¿Anular esta asignación de reto?')) {
-                              anularParticipacionReto(pr.id);
-                              showFeedback('Puntos anulados.');
-                            }
-                          }}
-                          className="text-red-400 hover:text-red-300 p-1"
-                          title="Anular"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                      <h4 className="font-extrabold text-white text-sm">{r.nombre}</h4>
+                      {r.descripcion && (
+                        <p className="text-xs text-slate-400 mt-1 line-clamp-2">
+                          {r.descripcion}
+                        </p>
                       )}
                     </div>
+
+                    {isEditing ? (
+                      <div className="p-3 bg-slate-900 rounded-xl border border-amber-500/50 space-y-2.5 text-xs">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                            Nombre del Reto:
+                          </label>
+                          <input
+                            type="text"
+                            value={editRetoNombre}
+                            onChange={(e) => setEditRetoNombre(e.target.value)}
+                            className="w-full bg-slate-800 text-white px-2 py-1 rounded border border-slate-700 text-xs"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                            Nuevo Valor (+pts):
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="5"
+                            value={editRetoPuntos}
+                            onChange={(e) => setEditRetoPuntos(Number(e.target.value))}
+                            className="w-full bg-slate-800 text-amber-300 font-extrabold px-2 py-1 rounded border border-slate-700 text-xs"
+                          />
+                        </div>
+
+                        <label className="flex items-start gap-2 cursor-pointer text-[11px] text-amber-300 bg-amber-500/10 p-2 rounded border border-amber-500/20">
+                          <input
+                            type="checkbox"
+                            checked={editRetoRetroactivo}
+                            onChange={(e) => setEditRetoRetroactivo(e.target.checked)}
+                            className="rounded bg-slate-800 border-amber-400 text-amber-500 mt-0.5"
+                          />
+                          <span>Recalcular retroactivo a todos los ganadores ya registrados</span>
+                        </label>
+
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            onClick={() => {
+                              actualizarReto(
+                                r.id,
+                                {
+                                  nombre: editRetoNombre.trim() || r.nombre,
+                                  puntos: Number(editRetoPuntos),
+                                },
+                                editRetoRetroactivo
+                              );
+                              setEditingRetoId(null);
+                              showFeedback(`Reto "${r.nombre}" actualizado a ${editRetoPuntos} pts.`);
+                            }}
+                            className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs"
+                          >
+                            Guardar
+                          </button>
+                          <button
+                            onClick={() => setEditingRetoId(null)}
+                            className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                        <button
+                          onClick={() => {
+                            setEditingRetoId(r.id);
+                            setEditRetoNombre(r.nombre);
+                            setEditRetoPuntos(r.puntos);
+                            setEditRetoRetroactivo(true);
+                          }}
+                          className="text-xs font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" /> Modificar Valor
+                        </button>
+                        <span className="text-[11px] text-slate-500">
+                          {participacionesRetos.filter((p) => p.retoId === r.id && !p.anulado).length} ganadores
+                        </span>
+                      </div>
+                    )}
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Award points to winner */}
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl lg:col-span-1 space-y-4">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                Asignar Puntos de Reto
+              </h3>
+
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="block text-slate-400 uppercase font-bold mb-1">
+                    Reto
+                  </label>
+                  <select
+                    value={selectedRetoId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setSelectedRetoId(id);
+                      const r = retos.find((item) => item.id === id);
+                      if (r) setRetoPointsToAward(r.puntos);
+                    }}
+                    className="w-full bg-slate-800 text-white p-2.5 rounded-xl border border-slate-700 font-medium"
+                  >
+                    {retos.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.nombre} (+{r.puntos} pts)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 uppercase font-bold mb-1">
+                    Grupo de Trabajo Ganador (GT)
+                  </label>
+                  <select
+                    value={selectedGtId}
+                    onChange={(e) => {
+                      setSelectedGtId(e.target.value);
+                      setSelectedPersonaId('');
+                    }}
+                    className="w-full bg-slate-800 text-white p-2.5 rounded-xl border border-slate-700 font-medium"
+                  >
+                    {gts.map((gt) => (
+                      <option key={gt.id} value={gt.id}>
+                        {gt.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 uppercase font-bold mb-1">
+                    Integrante Específico (Opcional)
+                  </label>
+                  <select
+                    value={selectedPersonaId}
+                    onChange={(e) => setSelectedPersonaId(e.target.value)}
+                    className="w-full bg-slate-800 text-white p-2.5 rounded-xl border border-slate-700 font-medium"
+                  >
+                    <option value="">Todo el GT (Reto Grupal)</option>
+                    {personas
+                      .filter((p) => p.gtId === selectedGtId && p.activo)
+                      .map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.nombreCompleto}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-slate-400 uppercase font-bold mb-1">
+                      Puntos a Otorgar
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="5"
+                      value={retoPointsToAward}
+                      onChange={(e) => setRetoPointsToAward(Number(e.target.value))}
+                      className="w-full bg-slate-800 text-white p-2 rounded-xl border border-slate-700 font-bold text-amber-300"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 uppercase font-bold mb-1">
+                      Posición
+                    </label>
+                    <select
+                      value={retoPosition}
+                      onChange={(e) => setRetoPosition(Number(e.target.value))}
+                      className="w-full bg-slate-800 text-white p-2 rounded-xl border border-slate-700"
+                    >
+                      <option value={1}>🥇 1er Puesto</option>
+                      <option value={2}>🥈 2do Puesto</option>
+                      <option value={3}>🥉 3er Puesto</option>
+                      <option value={4}>4to Puesto</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 uppercase font-bold mb-1">
+                    Observación
+                  </label>
+                  <input
+                    type="text"
+                    value={retoObs}
+                    onChange={(e) => setRetoObs(e.target.value)}
+                    placeholder="Detalle o justificación..."
+                    className="w-full bg-slate-800 text-white p-2 rounded-xl border border-slate-700"
+                  />
+                </div>
+
+                <button
+                  onClick={() => {
+                    asignarGanadorReto({
+                      retoId: selectedRetoId,
+                      gtId: selectedGtId,
+                      personaId: selectedPersonaId || null,
+                      puntos: Number(retoPointsToAward),
+                      posicion: retoPosition,
+                      observacion: retoObs,
+                    });
+                    showFeedback('¡Puntos de reto asignados exitosamente!');
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20"
+                >
+                  Otorgar Puntos de Reto
+                </button>
+              </div>
+            </div>
+
+            {/* List of challenges and awarded points */}
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl lg:col-span-2">
+              <h3 className="text-base font-bold text-white mb-4">
+                Historial de Retos Otorgados ({participacionesRetos.length})
+              </h3>
+
+              <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                {participacionesRetos.map((pr) => {
+                  const reto = retos.find((r) => r.id === pr.retoId);
+                  const gt = gts.find((g) => g.id === pr.gtId);
+                  const persona = pr.personaId
+                    ? personas.find((p) => p.id === pr.personaId)
+                    : null;
+                  const isEditingPr = editingPrId === pr.id;
+
+                  return (
+                    <div
+                      key={pr.id}
+                      className={`p-3 rounded-2xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
+                        pr.anulado
+                          ? 'bg-slate-800/30 border-slate-800 opacity-50 line-through'
+                          : 'bg-slate-800/60 border-slate-700'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-amber-300">
+                            {reto?.nombre || 'Reto'}
+                          </span>
+                          <span className="text-slate-400">• Puesto #{pr.posicion}</span>
+                        </div>
+                        <span className="text-slate-300">
+                          Otorgado a: <strong className="text-white">{gt?.nombre}</strong>{' '}
+                          {persona ? `(${persona.nombreCompleto})` : '(Grupal)'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {isEditingPr ? (
+                          <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-amber-500/50">
+                            <input
+                              type="number"
+                              className="w-16 bg-slate-800 text-amber-300 font-bold px-1.5 py-0.5 rounded text-xs border border-slate-600"
+                              value={editPrPuntos}
+                              onChange={(e) => setEditPrPuntos(Number(e.target.value))}
+                            />
+                            <button
+                              onClick={() => {
+                                actualizarParticipacionReto(pr.id, {
+                                  puntosOtorgados: Number(editPrPuntos),
+                                });
+                                setEditingPrId(null);
+                                showFeedback('Puntos de participación actualizados.');
+                              }}
+                              className="px-2 py-0.5 bg-emerald-600 text-white rounded font-bold text-[11px]"
+                            >
+                              ✓
+                            </button>
+                            <button
+                              onClick={() => setEditingPrId(null)}
+                              className="px-1.5 py-0.5 bg-slate-700 text-slate-300 rounded text-[11px]"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <span className="text-amber-400 font-bold text-sm">
+                              +{pr.puntosOtorgados} pts
+                            </span>
+                            {!pr.anulado && (
+                              <button
+                                onClick={() => {
+                                  setEditingPrId(pr.id);
+                                  setEditPrPuntos(pr.puntosOtorgados);
+                                }}
+                                className="text-slate-400 hover:text-amber-300 p-1"
+                                title="Editar puntos"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </>
+                        )}
+
+                        {!pr.anulado && (
+                          <button
+                            onClick={() => {
+                              if (window.confirm('¿Eliminar definitivamente este registro de reto?')) {
+                                eliminarParticipacionReto(pr.id);
+                                showFeedback('Puntos eliminados.');
+                              }
+                            }}
+                            className="text-red-400 hover:text-red-300 p-1"
+                            title="Eliminar registro"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
