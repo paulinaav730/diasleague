@@ -14,6 +14,9 @@ import {
   TrendingUp,
   Percent,
   RefreshCw,
+  Search,
+  UserPlus,
+  Plus,
 } from 'lucide-react';
 import { calcularFactorTamano } from '../../lib/calculator';
 
@@ -48,6 +51,21 @@ export const GtAttendanceSizeSection: React.FC = () => {
   );
   const [expandedGtId, setExpandedGtId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  // Quick manual registration state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [quickAddName, setQuickAddName] = useState('');
+  const [quickAddGtId, setQuickAddGtId] = useState(() => gts[0]?.id || '');
+  const [inlineNewMember, setInlineNewMember] = useState<{ [gtId: string]: string }>({});
+
+  // Suggestions for autocomplete
+  const nameSuggestions = useMemo(() => {
+    if (!quickAddName.trim() || quickAddName.length < 2) return [];
+    const query = quickAddName.toLowerCase();
+    return personas
+      .filter((p) => p.nombreCompleto.toLowerCase().includes(query))
+      .slice(0, 5);
+  }, [quickAddName, personas]);
 
   // Keep base points input synchronized when selected event changes
   React.useEffect(() => {
@@ -127,16 +145,18 @@ export const GtAttendanceSizeSection: React.FC = () => {
     } else {
       const persona = personas.find((p) => p.id === personaId);
       if (persona) {
-        registrarAsistencia({
+        const res = registrarAsistencia({
           eventoId: selectedEvento.id,
-          persona: {
-            nombreCompleto: persona.nombreCompleto,
-            gtId: persona.gtId,
-            id: persona.id,
-          },
-          origen: 'manual_admin',
+          personaId: persona.id,
+          nombreCompleto: persona.nombreCompleto,
+          gtId: persona.gtId,
+          origen: 'manual',
         });
-        showNotification(`Asistencia registrada para ${persona.nombreCompleto}.`);
+        if (res.success) {
+          showNotification(`Asistencia registrada para ${persona.nombreCompleto}.`);
+        } else {
+          showNotification(res.message);
+        }
       }
     }
   };
@@ -178,12 +198,10 @@ export const GtAttendanceSizeSection: React.FC = () => {
       for (const member of toAdd) {
         registrarAsistencia({
           eventoId: selectedEvento.id,
-          persona: {
-            nombreCompleto: member.nombreCompleto,
-            gtId: member.gtId,
-            id: member.id,
-          },
-          origen: 'manual_admin',
+          personaId: member.id,
+          nombreCompleto: member.nombreCompleto,
+          gtId: member.gtId,
+          origen: 'manual',
         });
       }
       showNotification(`Se registraron ${toAdd.length} asistentes en ${gtData.gt.nombre}.`);
@@ -201,6 +219,59 @@ export const GtAttendanceSizeSection: React.FC = () => {
   // Quick button: Clear attendance
   const handleClearAttendance = (gtId: string) => {
     handleSetBulkCount(gtId, 0);
+  };
+
+  // Quick manual registration of a person (new or existing) to this event
+  const handleQuickAddAttendance = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEvento) {
+      showNotification('Selecciona un evento primero.');
+      return;
+    }
+    if (!quickAddName.trim()) {
+      showNotification('Por favor escribe el nombre de la persona.');
+      return;
+    }
+
+    const targetGtId = quickAddGtId || gts[0]?.id;
+    const res = registrarAsistencia({
+      eventoId: selectedEvento.id,
+      nombreCompleto: quickAddName.trim(),
+      gtId: targetGtId,
+      origen: 'manual',
+    });
+
+    if (res.success) {
+      const gtObj = gts.find((g) => g.id === targetGtId);
+      showNotification(
+        `✓ Asistencia guardada: ${quickAddName.trim()} (${gtObj?.nombre || 'GT'}) en ${selectedEvento.nombre}.`
+      );
+      setQuickAddName('');
+    } else {
+      showNotification(res.message);
+    }
+  };
+
+  // Inline addition of a person directly into a specific GT
+  const handleAddInlineMember = (gtId: string) => {
+    if (!selectedEvento) return;
+    const name = (inlineNewMember[gtId] || '').trim();
+    if (!name) return;
+
+    const res = registrarAsistencia({
+      eventoId: selectedEvento.id,
+      nombreCompleto: name,
+      gtId: gtId,
+      origen: 'manual',
+    });
+
+    if (res.success) {
+      const gtObj = gts.find((g) => g.id === gtId);
+      showNotification(`✓ ${name} registrado como presente en ${gtObj?.nombre}.`);
+      setInlineNewMember((prev) => ({ ...prev, [gtId]: '' }));
+    } else {
+      showNotification(res.message);
+    }
   };
 
   return (
@@ -317,9 +388,116 @@ export const GtAttendanceSizeSection: React.FC = () => {
         )}
       </div>
 
+      {/* Manual Attendance Entry & Search Section */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <h4 className="text-base font-bold text-white flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-emerald-400" />
+              Cargar Asistencia Manual a {selectedEvento?.nombre || 'este Conectado'}
+            </h4>
+            <p className="text-xs text-slate-400">
+              Escribe el nombre de la persona que asistió y su GT. Si no estaba registrada previamente, se creará automáticamente y recibirá sus puntos.
+            </p>
+          </div>
+
+          {/* Search bar */}
+          <div className="relative w-full md:w-64 shrink-0">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Buscar integrante o GT..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-slate-950 text-white text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-700 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+            />
+          </div>
+        </div>
+
+        <form
+          onSubmit={handleQuickAddAttendance}
+          className="p-4 bg-slate-950/80 border border-slate-800 rounded-2xl flex flex-col md:flex-row items-end gap-3"
+        >
+          <div className="flex-1 w-full relative">
+            <label className="block text-[11px] font-bold text-slate-300 mb-1">
+              Nombre Completo de la Persona:
+            </label>
+            <input
+              type="text"
+              placeholder="Ej: Juan Pérez Echeverri..."
+              value={quickAddName}
+              onChange={(e) => setQuickAddName(e.target.value)}
+              className="w-full bg-slate-900 text-white text-xs px-3.5 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-500 font-medium"
+              required
+            />
+            {/* Live suggestions */}
+            {nameSuggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden divide-y divide-slate-800">
+                {nameSuggestions.map((sug) => {
+                  const sugGt = gts.find((g) => g.id === sug.gtId);
+                  return (
+                    <button
+                      key={sug.id}
+                      type="button"
+                      onClick={() => {
+                        setQuickAddName(sug.nombreCompleto);
+                        setQuickAddGtId(sug.gtId);
+                      }}
+                      className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center justify-between text-xs"
+                    >
+                      <span className="font-bold text-white">{sug.nombreCompleto}</span>
+                      <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded">
+                        {sugGt?.nombre || 'GT'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="w-full md:w-56">
+            <label className="block text-[11px] font-bold text-slate-300 mb-1">
+              Grupo de Trabajo (GT):
+            </label>
+            <select
+              value={quickAddGtId}
+              onChange={(e) => setQuickAddGtId(e.target.value)}
+              className="w-full bg-slate-900 text-amber-300 font-bold text-xs px-3.5 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-500"
+            >
+              {gts.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.nombre} ({g.codigo})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            type="submit"
+            className="w-full md:w-auto px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-lg shadow-emerald-600/30 shrink-0 flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            <Check className="w-4 h-4" />
+            <span>Registrar Asistencia (+{selectedEvento?.puntosAsistencia ?? 15} pts)</span>
+          </button>
+        </form>
+      </div>
+
       {/* GTs Attendance Table & Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {gtStats.map((item) => {
+        {gtStats
+          .filter((item) => {
+            if (!searchQuery.trim()) return true;
+            const q = searchQuery.toLowerCase().trim();
+            const matchGt =
+              item.gt.nombre.toLowerCase().includes(q) ||
+              item.gt.codigo.toLowerCase().includes(q);
+            const matchMember = item.activeMembers.some((m) =>
+              m.nombreCompleto.toLowerCase().includes(q)
+            );
+            return matchGt || matchMember;
+          })
+          .map((item) => {
           const isExpanded = expandedGtId === item.gt.id;
           const {
             gt,
@@ -552,6 +730,36 @@ export const GtAttendanceSizeSection: React.FC = () => {
                         </div>
                       );
                     })}
+
+                    {/* Add new member directly to this GT and mark present */}
+                    <div className="pt-2.5 mt-2 border-t border-slate-800 flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        placeholder={`+ Agregar persona a ${gt.nombre}...`}
+                        value={inlineNewMember[gt.id] || ''}
+                        onChange={(e) =>
+                          setInlineNewMember((prev) => ({
+                            ...prev,
+                            [gt.id]: e.target.value,
+                          }))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddInlineMember(gt.id);
+                          }
+                        }}
+                        className="flex-1 bg-slate-900 text-white text-[11px] px-2.5 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-amber-500 placeholder-slate-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddInlineMember(gt.id)}
+                        className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] rounded-lg shadow shrink-0 flex items-center gap-1 cursor-pointer"
+                        title="Crear en este GT y marcar como presente en este Conectado"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Presente
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

@@ -17,6 +17,11 @@ import {
   AlertCircle,
   FileSpreadsheet,
   Pencil,
+  Search,
+  UserPlus,
+  ChevronDown,
+  ChevronUp,
+  Check,
 } from 'lucide-react';
 import { Evento, Reto } from '../types';
 
@@ -108,6 +113,104 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
   const [manualNombre, setManualNombre] = useState('');
   const [manualGtId, setManualGtId] = useState<string>(gts[0]?.id || '');
   const [manualFeedback, setManualFeedback] = useState<string | null>(null);
+
+  // Roll call and search state for this Conectado
+  const [asistenciaSubTab, setAsistenciaSubTab] = useState<'rapido' | 'pase_lista'>('rapido');
+  const [searchAsistentes, setSearchAsistentes] = useState('');
+  const [expandedGtPaseId, setExpandedGtPaseId] = useState<string | null>(null);
+  const [inlineGtNewMember, setInlineGtNewMember] = useState<{ [gtId: string]: string }>({});
+
+  // Auto-suggestions for manual attendance input
+  const manualNameSuggestions = useMemo(() => {
+    if (!manualNombre.trim() || manualNombre.length < 2) return [];
+    const query = manualNombre.toLowerCase();
+    return personas
+      .filter((p) => p.nombreCompleto.toLowerCase().includes(query))
+      .slice(0, 5);
+  }, [manualNombre, personas]);
+
+  // Toggle single member attendance in this Conectado
+  const handleTogglePersonaAttendance = (personaId: string, gtId: string) => {
+    const existing = asistencias.find(
+      (a) => a.eventoId === evento.id && a.personaId === personaId && !a.anulado
+    );
+    if (existing) {
+      eliminarAsistencia(existing.id);
+      setManualFeedback('Asistencia removida.');
+    } else {
+      const persona = personas.find((p) => p.id === personaId);
+      if (persona) {
+        const res = registrarAsistencia({
+          eventoId: evento.id,
+          personaId: persona.id,
+          nombreCompleto: persona.nombreCompleto,
+          gtId: persona.gtId,
+          origen: 'manual',
+        });
+        setManualFeedback(res.message);
+      }
+    }
+    setTimeout(() => setManualFeedback(null), 3000);
+  };
+
+  // Add a new member directly to a GT and mark present in this Conectado
+  const handleAddMemberToGtAndAttend = (gtId: string) => {
+    const name = (inlineGtNewMember[gtId] || '').trim();
+    if (!name) return;
+
+    const res = registrarAsistencia({
+      eventoId: evento.id,
+      nombreCompleto: name,
+      gtId: gtId,
+      origen: 'manual',
+    });
+
+    setManualFeedback(res.message);
+    if (res.success) {
+      setInlineGtNewMember((prev) => ({ ...prev, [gtId]: '' }));
+    }
+    setTimeout(() => setManualFeedback(null), 3000);
+  };
+
+  // Mark all GT members present (100%)
+  const handleSetGtFullAttendance = (gtId: string) => {
+    const gtMembers = personas.filter((p) => p.gtId === gtId && p.activo);
+    const attendedIds = new Set(
+      asistencias
+        .filter((a) => a.eventoId === evento.id && a.gtId === gtId && !a.anulado)
+        .map((a) => a.personaId)
+    );
+
+    let added = 0;
+    for (const m of gtMembers) {
+      if (!attendedIds.has(m.id)) {
+        registrarAsistencia({
+          eventoId: evento.id,
+          personaId: m.id,
+          nombreCompleto: m.nombreCompleto,
+          gtId: m.gtId,
+          origen: 'manual',
+        });
+        added++;
+      }
+    }
+    const gtObj = gts.find((g) => g.id === gtId);
+    setManualFeedback(`Se marcaron ${added} nuevos asistentes en ${gtObj?.nombre}.`);
+    setTimeout(() => setManualFeedback(null), 3000);
+  };
+
+  // Clear all attendances for a GT in this Conectado
+  const handleClearGtAttendance = (gtId: string) => {
+    const toRemove = asistencias.filter(
+      (a) => a.eventoId === evento.id && a.gtId === gtId && !a.anulado
+    );
+    for (const a of toRemove) {
+      eliminarAsistencia(a.id);
+    }
+    const gtObj = gts.find((g) => g.id === gtId);
+    setManualFeedback(`Se eliminaron las asistencias de ${gtObj?.nombre}.`);
+    setTimeout(() => setManualFeedback(null), 3000);
+  };
 
   // Calculate General Result of this Conectado (Attendance based on GT size + Retos)
   const resultadoConectado = useMemo(() => {
@@ -1132,66 +1235,293 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
           {/* ========================================================================= */}
           {activeTab === 'asistencias' && (
             <div className="space-y-5">
-              {/* Quick Manual Entry Bar */}
-              <form
-                onSubmit={handleQuickManualAttendance}
-                className="p-4 bg-slate-850 border border-slate-800 rounded-2xl flex flex-col sm:flex-row items-end gap-3"
-              >
-                <div className="flex-1 w-full">
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                    Cargar Asistencia Manual (Nombre Completo):
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Escribe el nombre del integrante..."
-                    value={manualNombre}
-                    onChange={(e) => setManualNombre(e.target.value)}
-                    className="w-full bg-slate-900 text-white text-xs px-3 py-2 rounded-xl border border-slate-700"
-                    required
-                  />
-                </div>
-
-                <div className="w-full sm:w-48">
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                    GT:
-                  </label>
-                  <select
-                    value={manualGtId}
-                    onChange={(e) => setManualGtId(e.target.value)}
-                    className="w-full bg-slate-900 text-white text-xs px-3 py-2 rounded-xl border border-slate-700 font-bold"
+              {/* Mode Switcher */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-850 p-2 rounded-2xl border border-slate-800">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAsistenciaSubTab('rapido')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      asistenciaSubTab === 'rapido'
+                        ? 'bg-amber-600 text-white shadow-md'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    }`}
                   >
-                    {gts.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.nombre}
-                      </option>
-                    ))}
-                  </select>
+                    <UserPlus className="w-3.5 h-3.5" />
+                    Entrada Rápida Manual
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAsistenciaSubTab('pase_lista')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      asistenciaSubTab === 'pase_lista'
+                        ? 'bg-amber-600 text-white shadow-md'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                    }`}
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    Pase de Lista por GT (Nominal)
+                  </button>
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full sm:w-auto px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shrink-0 shadow"
-                >
-                  + Cargar Asistencia
-                </button>
-              </form>
+                <div className="text-xs text-slate-400 pr-2">
+                  Total Asistencias: <strong className="text-white">{asistenciasConectado.length}</strong>
+                </div>
+              </div>
 
+              {/* Feedback alert */}
               {manualFeedback && (
-                <div className="p-3 bg-emerald-950/60 border border-emerald-500/50 text-emerald-300 text-xs rounded-xl flex items-center gap-2">
+                <div className="p-3 bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 text-xs rounded-xl flex items-center gap-2 animate-fade-in">
                   <CheckCircle2 className="w-4 h-4 shrink-0" />
                   <span>{manualFeedback}</span>
                 </div>
               )}
 
+              {/* SUBTAB 1: Quick Manual Entry Bar */}
+              {asistenciaSubTab === 'rapido' && (
+                <form
+                  onSubmit={handleQuickManualAttendance}
+                  className="p-4 bg-slate-850 border border-slate-800 rounded-2xl flex flex-col sm:flex-row items-end gap-3"
+                >
+                  <div className="flex-1 w-full relative">
+                    <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                      Nombre Completo del Asistente:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Escribe el nombre del integrante..."
+                      value={manualNombre}
+                      onChange={(e) => setManualNombre(e.target.value)}
+                      className="w-full bg-slate-900 text-white text-xs px-3.5 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-500"
+                      required
+                    />
+                    {/* Live suggestions */}
+                    {manualNameSuggestions.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden divide-y divide-slate-800">
+                        {manualNameSuggestions.map((sug) => {
+                          const sugGt = gts.find((g) => g.id === sug.gtId);
+                          return (
+                            <button
+                              key={sug.id}
+                              type="button"
+                              onClick={() => {
+                                setManualNombre(sug.nombreCompleto);
+                                setManualGtId(sug.gtId);
+                              }}
+                              className="w-full px-3 py-2 text-left hover:bg-slate-800 flex items-center justify-between text-xs"
+                            >
+                              <span className="font-bold text-white">{sug.nombreCompleto}</span>
+                              <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded">
+                                {sugGt?.nombre || 'GT'}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="w-full sm:w-48">
+                    <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                      GT:
+                    </label>
+                    <select
+                      value={manualGtId}
+                      onChange={(e) => setManualGtId(e.target.value)}
+                      className="w-full bg-slate-900 text-amber-300 font-bold text-xs px-3.5 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:border-amber-500"
+                    >
+                      {gts.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.nombre} ({g.codigo})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shrink-0 shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>+ Cargar Asistencia (+{evento.puntosAsistencia} pts)</span>
+                  </button>
+                </form>
+              )}
+
+              {/* SUBTAB 2: Roll call checklist by GT */}
+              {asistenciaSubTab === 'pase_lista' && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {gts.map((gt) => {
+                      const members = personas.filter((p) => p.gtId === gt.id && p.activo);
+                      const gtAsists = asistenciasConectado.filter((a) => a.gtId === gt.id);
+                      const isExpanded = expandedGtPaseId === gt.id;
+
+                      return (
+                        <div
+                          key={gt.id}
+                          className="bg-slate-850 border border-slate-800 rounded-2xl p-3.5 space-y-3 flex flex-col justify-between"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="w-3 h-3 rounded-full shrink-0"
+                                  style={{ backgroundColor: gt.color || '#f59e0b' }}
+                                />
+                                <div>
+                                  <h5 className="font-bold text-xs text-white leading-tight">
+                                    {gt.nombre}
+                                  </h5>
+                                  <span className="text-[10px] text-slate-400">
+                                    {gtAsists.length} de {members.length} presentes
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Action pills */}
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSetGtFullAttendance(gt.id)}
+                                  className="px-2 py-0.5 rounded bg-slate-800 hover:bg-emerald-600/30 text-emerald-400 text-[10px] font-bold border border-slate-700"
+                                  title="Marcar todos los integrantes presentes"
+                                >
+                                  100%
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleClearGtAttendance(gt.id)}
+                                  className="px-2 py-0.5 rounded bg-slate-800 hover:bg-red-600/30 text-red-400 text-[10px] font-bold border border-slate-700"
+                                  title="Limpiar asistencias de este GT"
+                                >
+                                  0%
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Collapsible member list */}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedGtPaseId(isExpanded ? null : gt.id)
+                              }
+                              className="w-full py-1 px-2 rounded-lg bg-slate-900/60 hover:bg-slate-900 text-[11px] text-slate-400 hover:text-white flex items-center justify-between font-bold"
+                            >
+                              <span>Ver integrantes ({members.length})</span>
+                              {isExpanded ? (
+                                <ChevronUp className="w-3.5 h-3.5" />
+                              ) : (
+                                <ChevronDown className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+
+                            {isExpanded && (
+                              <div className="mt-2 space-y-1 max-h-48 overflow-y-auto pr-1">
+                                {members.map((member) => {
+                                  const isAttending = gtAsists.some(
+                                    (a) => a.personaId === member.id
+                                  );
+
+                                  return (
+                                    <div
+                                      key={member.id}
+                                      onClick={() =>
+                                        handleTogglePersonaAttendance(member.id, gt.id)
+                                      }
+                                      className="flex items-center justify-between p-1.5 rounded-lg text-xs cursor-pointer hover:bg-slate-800/80 transition-colors"
+                                    >
+                                      <span
+                                        className={
+                                          isAttending
+                                            ? 'text-white font-bold'
+                                            : 'text-slate-500'
+                                        }
+                                      >
+                                        {member.nombreCompleto}
+                                      </span>
+
+                                      <span
+                                        className={`px-2 py-0.5 rounded text-[10px] font-black uppercase flex items-center gap-1 ${
+                                          isAttending
+                                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                            : 'bg-slate-800 text-slate-500'
+                                        }`}
+                                      >
+                                        {isAttending ? (
+                                          <>
+                                            <Check className="w-3 h-3" /> Presente
+                                          </>
+                                        ) : (
+                                          'Ausente'
+                                        )}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+
+                                {/* Inline add to this GT */}
+                                <div className="pt-2 mt-2 border-t border-slate-800 flex items-center gap-1">
+                                  <input
+                                    type="text"
+                                    placeholder={`+ Persona en ${gt.codigo}...`}
+                                    value={inlineGtNewMember[gt.id] || ''}
+                                    onChange={(e) =>
+                                      setInlineGtNewMember((prev) => ({
+                                        ...prev,
+                                        [gt.id]: e.target.value,
+                                      }))
+                                    }
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleAddMemberToGtAndAttend(gt.id);
+                                      }
+                                    }}
+                                    className="flex-1 bg-slate-900 text-white text-[11px] px-2 py-1 rounded-lg border border-slate-700 placeholder-slate-500"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddMemberToGtAndAttend(gt.id)}
+                                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] rounded-lg"
+                                  >
+                                    + Presente
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Attendances List */}
               <div className="bg-slate-850 border border-slate-800 rounded-2xl overflow-hidden">
-                <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-                  <h4 className="font-bold text-xs text-white uppercase tracking-wider">
-                    Lista de Asistentes ({asistenciasConectado.length})
-                  </h4>
-                  <span className="text-xs text-slate-400 font-medium">
-                    +{evento.puntosAsistencia} pts cada uno
-                  </span>
+                <div className="p-4 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="font-bold text-xs text-white uppercase tracking-wider">
+                      Lista de Asistentes ({asistenciasConectado.length})
+                    </h4>
+                    <span className="text-[11px] text-slate-400 font-medium">
+                      +{evento.puntosAsistencia} pts otorgados a cada participante
+                    </span>
+                  </div>
+
+                  {/* Filter Attendees Search */}
+                  <div className="relative w-full sm:w-60">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Filtrar asistente o GT..."
+                      value={searchAsistentes}
+                      onChange={(e) => setSearchAsistentes(e.target.value)}
+                      className="w-full bg-slate-900 text-white text-xs pl-8 pr-3 py-1.5 rounded-xl border border-slate-700 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
                 </div>
 
                 {asistenciasConectado.length === 0 ? (
@@ -1200,89 +1530,103 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
                   </div>
                 ) : (
                   <div className="max-h-80 overflow-y-auto divide-y divide-slate-800">
-                    {asistenciasConectado.map((asist) => {
-                      const persona = personas.find((p) => p.id === asist.personaId);
-                      const gt = gts.find((g) => g.id === asist.gtId);
+                    {asistenciasConectado
+                      .filter((asist) => {
+                        if (!searchAsistentes.trim()) return true;
+                        const q = searchAsistentes.toLowerCase().trim();
+                        const persona = personas.find((p) => p.id === asist.personaId);
+                        const gt = gts.find((g) => g.id === asist.gtId);
+                        const matchPersona =
+                          persona?.nombreCompleto.toLowerCase().includes(q) || false;
+                        const matchGt =
+                          gt?.nombre.toLowerCase().includes(q) ||
+                          gt?.codigo.toLowerCase().includes(q) ||
+                          false;
+                        return matchPersona || matchGt;
+                      })
+                      .map((asist) => {
+                        const persona = personas.find((p) => p.id === asist.personaId);
+                        const gt = gts.find((g) => g.id === asist.gtId);
 
-                      return (
-                        <div
-                          key={asist.id}
-                          className="p-3 hover:bg-slate-800/50 flex items-center justify-between text-xs"
-                        >
-                          <div className="flex items-center gap-3">
-                            <span
-                              className="w-2.5 h-2.5 rounded-full"
-                              style={{ backgroundColor: gt?.color || '#94a3b8' }}
-                            />
-                            <div>
-                              <span className="font-bold text-white block">
-                                {persona?.nombreCompleto || 'Participante'}
-                              </span>
-                              <span className="text-[10px] text-slate-400">
-                                GT: {gt?.nombre} • {new Date(asist.fechaRegistro).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
+                        return (
+                          <div
+                            key={asist.id}
+                            className="p-3 hover:bg-slate-800/50 flex items-center justify-between text-xs"
+                          >
+                            <div className="flex items-center gap-3">
+                              <span
+                                className="w-2.5 h-2.5 rounded-full"
+                                style={{ backgroundColor: gt?.color || '#94a3b8' }}
+                              />
+                              <div>
+                                <span className="font-bold text-white block">
+                                  {persona?.nombreCompleto || 'Participante'}
+                                </span>
+                                <span className="text-[10px] text-slate-400">
+                                  GT: {gt?.nombre} • {new Date(asist.fechaRegistro).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {editingAsistId === asist.id ? (
+                                <div className="flex items-center gap-1.5 bg-slate-900 px-2 py-1 rounded-lg border border-amber-500/50">
+                                  <input
+                                    type="number"
+                                    className="w-16 bg-slate-800 text-amber-400 font-bold px-1.5 py-0.5 rounded text-xs border border-slate-700"
+                                    value={editingAsistPuntos}
+                                    onChange={(e) => setEditingAsistPuntos(Number(e.target.value))}
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      actualizarAsistencia(asist.id, {
+                                        puntosOtorgados: Number(editingAsistPuntos),
+                                      });
+                                      setEditingAsistId(null);
+                                    }}
+                                    className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold text-[11px]"
+                                  >
+                                    ✓
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingAsistId(null)}
+                                    className="px-1.5 py-0.5 bg-slate-700 text-slate-300 rounded text-[11px]"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ) : (
+                                <>
+                                  <span className="text-emerald-400 font-bold">
+                                    +{asist.puntosOtorgados} pts
+                                  </span>
+                                  <button
+                                    onClick={() => {
+                                      setEditingAsistId(asist.id);
+                                      setEditingAsistPuntos(asist.puntosOtorgados);
+                                    }}
+                                    className="text-slate-400 hover:text-amber-300 text-xs p-1"
+                                    title="Editar puntos de esta asistencia"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
+                                </>
+                              )}
+                              <button
+                                onClick={() => {
+                                  if (window.confirm('¿Eliminar definitivamente este registro de asistencia?')) {
+                                    eliminarAsistencia(asist.id);
+                                  }
+                                }}
+                                className="text-slate-500 hover:text-red-400 text-xs p-1"
+                                title="Eliminar asistencia"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           </div>
-
-                          <div className="flex items-center gap-2">
-                            {editingAsistId === asist.id ? (
-                              <div className="flex items-center gap-1.5 bg-slate-900 px-2 py-1 rounded-lg border border-amber-500/50">
-                                <input
-                                  type="number"
-                                  className="w-16 bg-slate-800 text-amber-400 font-bold px-1.5 py-0.5 rounded text-xs border border-slate-700"
-                                  value={editingAsistPuntos}
-                                  onChange={(e) => setEditingAsistPuntos(Number(e.target.value))}
-                                />
-                                <button
-                                  onClick={() => {
-                                    actualizarAsistencia(asist.id, {
-                                      puntosOtorgados: Number(editingAsistPuntos),
-                                    });
-                                    setEditingAsistId(null);
-                                  }}
-                                  className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold text-[11px]"
-                                >
-                                  ✓
-                                </button>
-                                <button
-                                  onClick={() => setEditingAsistId(null)}
-                                  className="px-1.5 py-0.5 bg-slate-700 text-slate-300 rounded text-[11px]"
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                            ) : (
-                              <>
-                                <span className="text-emerald-400 font-bold">
-                                  +{asist.puntosOtorgados} pts
-                                </span>
-                                <button
-                                  onClick={() => {
-                                    setEditingAsistId(asist.id);
-                                    setEditingAsistPuntos(asist.puntosOtorgados);
-                                  }}
-                                  className="text-slate-400 hover:text-amber-300 text-xs p-1"
-                                  title="Editar puntos de esta asistencia"
-                                >
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </button>
-                              </>
-                            )}
-                            <button
-                              onClick={() => {
-                                if (window.confirm('¿Eliminar definitivamente este registro de asistencia?')) {
-                                  eliminarAsistencia(asist.id);
-                                }
-                              }}
-                              className="text-slate-500 hover:text-red-400 text-xs p-1"
-                              title="Eliminar asistencia"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                   </div>
                 )}
               </div>
