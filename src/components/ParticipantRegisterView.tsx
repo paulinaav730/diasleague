@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { useApp } from '../lib/store';
 import {
@@ -36,28 +36,101 @@ export const ParticipantRegisterView: React.FC<ParticipantRegisterViewProps> = (
     asistencias,
   } = useApp();
 
-  // Find active event and shift
-  const defaultEvent =
-    eventos.find((e) => e.id === initialEventoId) ||
-    eventos.find((e) => e.estado === 'activo' && e.utilizaQr) ||
-    eventos.find((e) => e.estado === 'activo') ||
-    eventos[0];
+  // Read URL query params immediately and safely
+  const urlParams = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search);
+    }
+    return null;
+  }, []);
+
+  const urlEventoId = urlParams?.get('eventoId');
+  const urlTurnoId = urlParams?.get('turnoId');
+
+  const resolvedInitialEventoId = useMemo(() => {
+    if (initialEventoId && initialEventoId !== 'undefined' && initialEventoId !== 'null') {
+      return initialEventoId;
+    }
+    if (urlEventoId && urlEventoId !== 'undefined' && urlEventoId !== 'null') {
+      return urlEventoId;
+    }
+    return undefined;
+  }, [initialEventoId, urlEventoId]);
+
+  const resolvedInitialTurnoId = useMemo(() => {
+    if (initialTurnoId && initialTurnoId !== 'undefined' && initialTurnoId !== 'null') {
+      return initialTurnoId;
+    }
+    if (urlTurnoId && urlTurnoId !== 'undefined' && urlTurnoId !== 'null') {
+      return urlTurnoId;
+    }
+    return undefined;
+  }, [initialTurnoId, urlTurnoId]);
+
+  // Find active event
+  const defaultEvent = useMemo(() => {
+    if (resolvedInitialEventoId) {
+      const found = eventos.find((e) => e.id === resolvedInitialEventoId);
+      if (found) return found;
+    }
+    const eventWithActiveTurno = turnos.find((t) => t.activo)?.eventoId;
+    if (eventWithActiveTurno) {
+      const found = eventos.find((e) => e.id === eventWithActiveTurno);
+      if (found) return found;
+    }
+    return (
+      eventos.find((e) => e.estado === 'activo' && e.utilizaQr) ||
+      eventos.find((e) => e.estado === 'activo') ||
+      eventos[0]
+    );
+  }, [resolvedInitialEventoId, eventos, turnos]);
 
   const [selectedEventoId, setSelectedEventoId] = useState<string>(
     defaultEvent?.id || ''
   );
 
-  const activeEvento = eventos.find((e) => e.id === selectedEventoId) || defaultEvent;
-  const availableTurnos = turnos.filter((t) => t.eventoId === activeEvento?.id);
+  // Sync selectedEventoId when resolvedInitialEventoId changes
+  useEffect(() => {
+    if (resolvedInitialEventoId && eventos.some((e) => e.id === resolvedInitialEventoId)) {
+      setSelectedEventoId(resolvedInitialEventoId);
+    }
+  }, [resolvedInitialEventoId, eventos]);
 
-  const defaultTurno =
-    availableTurnos.find((t) => t.id === initialTurnoId) ||
-    availableTurnos.find((t) => t.activo) ||
-    availableTurnos[0];
+  const activeEvento = eventos.find((e) => e.id === selectedEventoId) || defaultEvent;
+  const availableTurnos = useMemo(() => {
+    return turnos.filter((t) => t.eventoId === activeEvento?.id);
+  }, [turnos, activeEvento?.id]);
+
+  const defaultTurno = useMemo(() => {
+    if (resolvedInitialTurnoId) {
+      const found = availableTurnos.find((t) => t.id === resolvedInitialTurnoId);
+      if (found) return found;
+    }
+    return (
+      availableTurnos.find((t) => t.activo) ||
+      availableTurnos[0]
+    );
+  }, [resolvedInitialTurnoId, availableTurnos]);
 
   const [selectedTurnoId, setSelectedTurnoId] = useState<string>(
     defaultTurno?.id || ''
   );
+
+  // Sync selectedTurnoId when resolvedInitialTurnoId changes or availableTurnos changes
+  useEffect(() => {
+    if (resolvedInitialTurnoId && availableTurnos.some((t) => t.id === resolvedInitialTurnoId)) {
+      setSelectedTurnoId(resolvedInitialTurnoId);
+      return;
+    }
+    const active = availableTurnos.find((t) => t.activo);
+    if (active) {
+      setSelectedTurnoId(active.id);
+    } else if (availableTurnos.length > 0) {
+      setSelectedTurnoId(availableTurnos[0].id);
+    } else {
+      setSelectedTurnoId('');
+    }
+  }, [resolvedInitialTurnoId, availableTurnos, selectedEventoId]);
 
   const activeTurno =
     availableTurnos.find((t) => t.id === selectedTurnoId) || defaultTurno;

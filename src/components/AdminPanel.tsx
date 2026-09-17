@@ -31,6 +31,7 @@ import {
   FileSpreadsheet,
   Award,
   LogOut,
+  Tv,
 } from 'lucide-react';
 
 type AdminTab =
@@ -55,7 +56,11 @@ const PRESET_HORARIOS = [
   { label: '06:00 PM - 08:00 PM', inicio: '06:00 PM', fin: '08:00 PM' },
 ];
 
-export const AdminPanel: React.FC = () => {
+interface AdminPanelProps {
+  onOpenQrProjector?: (eventoId: string, turnoId?: string) => void;
+}
+
+export const AdminPanel: React.FC<AdminPanelProps> = ({ onOpenQrProjector }) => {
   const {
     temporadas,
     gts,
@@ -540,6 +545,18 @@ export const AdminPanel: React.FC = () => {
                           <span>{e.utilizaTurnos ? 'Con Turnos' : '+ Turnos'}</span>
                         </button>
 
+                        {onOpenQrProjector && (
+                          <button
+                            type="button"
+                            onClick={() => onOpenQrProjector(e.id)}
+                            className="px-2.5 py-1.5 rounded-xl bg-amber-600/90 hover:bg-amber-500 text-white font-bold text-xs flex items-center gap-1 shadow cursor-pointer transition-colors"
+                            title="Proyectar QR en pantalla para este evento"
+                          >
+                            <Tv className="w-3.5 h-3.5" />
+                            <span>Proyectar QR</span>
+                          </button>
+                        )}
+
                         <button
                           onClick={() => setSelectedConectadoModalId(e.id)}
                           className="px-3 py-1.5 rounded-xl bg-purple-600/80 hover:bg-purple-600 text-white font-bold text-xs flex items-center gap-1 shadow cursor-pointer"
@@ -791,6 +808,17 @@ export const AdminPanel: React.FC = () => {
                                   </button>
 
                                   <div className="flex items-center gap-1.5">
+                                    {onOpenQrProjector && (
+                                      <button
+                                        type="button"
+                                        onClick={() => onOpenQrProjector(e.id, t.id)}
+                                        className="px-2 py-1 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                        title="Proyectar QR específico de este turno"
+                                      >
+                                        <Tv className="w-3 h-3" /> Proyectar
+                                      </button>
+                                    )}
+
                                     {t.activo ? (
                                       <button
                                         type="button"
@@ -2111,6 +2139,7 @@ export const AdminPanel: React.FC = () => {
         <ConectadoDetalleModal
           eventoId={selectedConectadoModalId}
           onClose={() => setSelectedConectadoModalId(null)}
+          onOpenQrProjector={onOpenQrProjector}
         />
       )}
 

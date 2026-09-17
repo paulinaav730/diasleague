@@ -34,27 +34,50 @@ function AppContent() {
   const [selectedPersonaId, setSelectedPersonaId] = useState<string | null>(null);
   const [selectedConectadoId, setSelectedConectadoId] = useState<string | null>(null);
 
-  // Preselected event/shift for QR registration flow
+  // Target state for participant registration by QR scan or direct link
   const [targetEventoId, setTargetEventoId] = useState<string | undefined>();
   const [targetTurnoId, setTargetTurnoId] = useState<string | undefined>();
   const [targetToken, setTargetToken] = useState<string | undefined>();
 
-  // Check URL parameters on mount (for QR code scan detection)
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const tabParam = params.get('tab');
-      const eventoIdParam = params.get('eventoId');
-      const turnoIdParam = params.get('turnoId');
-      const tokenParam = params.get('token');
+  // Target state for projector QR display
+  const [projectorEventoId, setProjectorEventoId] = useState<string | undefined>();
+  const [projectorTurnoId, setProjectorTurnoId] = useState<string | undefined>();
 
-      if (tabParam === 'registro' || tokenParam) {
-        setActiveTab('registro');
-        if (eventoIdParam) setTargetEventoId(eventoIdParam);
-        if (turnoIdParam) setTargetTurnoId(turnoIdParam);
-        if (tokenParam) setTargetToken(tokenParam);
+  // Check URL parameters on mount and popstate (for QR code scan detection)
+  useEffect(() => {
+    const parseUrlParams = () => {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const tabParam = params.get('tab');
+        const eventoIdParam = params.get('eventoId');
+        const turnoIdParam = params.get('turnoId');
+        const tokenParam = params.get('token');
+
+        const cleanParam = (val: string | null) => {
+          if (!val || val === 'undefined' || val === 'null') return undefined;
+          return val;
+        };
+
+        const cleanEventoId = cleanParam(eventoIdParam);
+        const cleanTurnoId = cleanParam(turnoIdParam);
+        const cleanToken = cleanParam(tokenParam);
+
+        if (tabParam === 'registro' || cleanToken || cleanEventoId) {
+          setActiveTab('registro');
+          if (cleanEventoId) setTargetEventoId(cleanEventoId);
+          if (cleanTurnoId) setTargetTurnoId(cleanTurnoId);
+          if (cleanToken) setTargetToken(cleanToken);
+        } else if (tabParam === 'qr-proyector' || tabParam === 'qr_proyector') {
+          setActiveTab('qr-proyector');
+          if (cleanEventoId) setProjectorEventoId(cleanEventoId);
+          if (cleanTurnoId) setProjectorTurnoId(cleanTurnoId);
+        }
       }
-    }
+    };
+
+    parseUrlParams();
+    window.addEventListener('popstate', parseUrlParams);
+    return () => window.removeEventListener('popstate', parseUrlParams);
   }, [setActiveTab]);
 
   const handleSimulateScan = (token: string, turnoId: string, eventoId: string) => {
@@ -65,6 +88,8 @@ function AppContent() {
   };
 
   const handleOpenQrProjectorForEvent = (eventoId: string, turnoId?: string) => {
+    setProjectorEventoId(eventoId);
+    setProjectorTurnoId(turnoId);
     setActiveTab('qr-proyector');
   };
 
@@ -219,7 +244,11 @@ function AppContent() {
         {/* ========================================================================= */}
         {(activeTab === 'qr-proyector' || activeTab === 'qr_proyector') && (
           <div className="space-y-6">
-            <ProjectorQrView onSimulateScan={handleSimulateScan} />
+            <ProjectorQrView
+              initialEventoId={projectorEventoId}
+              initialTurnoId={projectorTurnoId}
+              onSimulateScan={handleSimulateScan}
+            />
           </div>
         )}
 
@@ -257,7 +286,11 @@ function AppContent() {
         {/* TAB: PANEL DE ADMINISTRACIÓN                                              */}
         {/* ========================================================================= */}
         {activeTab === 'admin' && (
-          isAdmin ? <AdminPanel /> : <AdminLoginCard />
+          isAdmin ? (
+            <AdminPanel onOpenQrProjector={handleOpenQrProjectorForEvent} />
+          ) : (
+            <AdminLoginCard />
+          )
         )}
       </main>
 
