@@ -29,6 +29,7 @@ export interface Persona {
   temporadaId: string;
   activo: boolean;
   email?: string;
+  correo?: string;
   codigoEstudiantil?: string;
   turnosMesa?: string[];
   createdAt: string;
@@ -76,11 +77,13 @@ export interface Asistencia {
   gtId: string;
   puntosOtorgados: number;
   fechaRegistro: string;
-  origen: 'qr' | 'manual';
+  origen?: 'qr' | 'manual';
+  metodoRegistro?: 'qr' | 'manual';
   esTurnoMesa?: boolean; // When true, MESA person on duty -> personal points granted, GT points 0
   actividadTipo?: string;
   anulado?: boolean;
   anuladoMotivo?: string;
+  createdAt?: string;
 }
 
 export type RetoTipo = 'individual' | 'grupal';
@@ -109,8 +112,9 @@ export interface ParticipacionReto {
   puntosOtorgados: number;
   posicion?: number; // 1 = 1er puesto, etc.
   observacion?: string;
-  fechaRegistro: string;
+  fechaRegistro?: string;
   anulado?: boolean;
+  createdAt?: string;
 }
 
 export interface FactorTamanoRango {

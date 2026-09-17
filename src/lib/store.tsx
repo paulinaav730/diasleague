@@ -132,6 +132,7 @@ interface AppContextType {
   actualizarTurno: (id: string, updates: Partial<Turno>) => void;
   activarTurno: (id: string) => void;
   cerrarTurno: (id: string) => void;
+  eliminarTurno: (id: string) => void;
 
   // Actions - Retos
   crearReto: (reto: Omit<Reto, 'id' | 'createdAt'>) => void;
@@ -263,7 +264,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [personas, setPersonas] = useState<Persona[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY + '_personas');
-    const list: Persona[] = saved ? JSON.parse(saved) : INITIAL_PERSONAS;
+    const parsed: Persona[] | null = saved ? JSON.parse(saved) : null;
+    const list: Persona[] = parsed && parsed.length > 0 ? parsed : INITIAL_PERSONAS;
     return list.map((p) => (p.gtId === 'gt-publicidad' ? { ...p, gtId: 'gt-mercadeo' } : p));
   });
 
@@ -279,7 +281,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [asistencias, setAsistencias] = useState<Asistencia[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY + '_asistencias');
-    const list: Asistencia[] = saved ? JSON.parse(saved) : INITIAL_ASISTENCIAS;
+    const parsed: Asistencia[] | null = saved ? JSON.parse(saved) : null;
+    const list: Asistencia[] = parsed && parsed.length > 0 ? parsed : INITIAL_ASISTENCIAS;
     return list.map((a) => (a.gtId === 'gt-publicidad' ? { ...a, gtId: 'gt-mercadeo' } : a));
   });
 
@@ -290,7 +293,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [participacionesRetos, setParticipacionesRetos] = useState<ParticipacionReto[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY + '_participacionesRetos');
-    const list: ParticipacionReto[] = saved ? JSON.parse(saved) : INITIAL_PARTICIPACION_RETOS;
+    const parsed: ParticipacionReto[] | null = saved ? JSON.parse(saved) : null;
+    const list: ParticipacionReto[] = parsed && parsed.length > 0 ? parsed : INITIAL_PARTICIPACION_RETOS;
     return list.map((pr) => (pr.gtId === 'gt-publicidad' ? { ...pr, gtId: 'gt-mercadeo' } : pr));
   });
 
@@ -933,6 +937,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [addAuditLog]
   );
 
+  const eliminarTurno = useCallback(
+    (id: string) => {
+      const t = turnos.find((item) => item.id === id);
+      setTurnos((prev) => prev.filter((item) => item.id !== id));
+      addAuditLog('ELIMINAR_TURNO', 'turno', id, `Se eliminó el turno ${t?.nombre || id}`);
+    },
+    [turnos, addAuditLog]
+  );
+
   // Retos
   const crearReto = useCallback(
     (data: Omit<Reto, 'id' | 'createdAt'>) => {
@@ -1483,6 +1496,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       actualizarTurno,
       activarTurno,
       cerrarTurno,
+      eliminarTurno,
       crearReto,
       actualizarReto,
       eliminarReto,
@@ -1548,6 +1562,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       actualizarTurno,
       activarTurno,
       cerrarTurno,
+      eliminarTurno,
       crearReto,
       actualizarReto,
       eliminarReto,

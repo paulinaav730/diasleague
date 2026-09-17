@@ -22,8 +22,19 @@ import {
   ChevronDown,
   ChevronUp,
   Check,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import { Evento, Reto } from '../types';
+
+const PRESET_HORARIOS = [
+  { label: '08:00 AM - 10:00 AM', inicio: '08:00 AM', fin: '10:00 AM' },
+  { label: '10:00 AM - 12:00 PM', inicio: '10:00 AM', fin: '12:00 PM' },
+  { label: '12:00 PM - 02:00 PM', inicio: '12:00 PM', fin: '02:00 PM' },
+  { label: '02:00 PM - 04:00 PM', inicio: '02:00 PM', fin: '04:00 PM' },
+  { label: '04:00 PM - 06:00 PM', inicio: '04:00 PM', fin: '06:00 PM' },
+  { label: '06:00 PM - 08:00 PM', inicio: '06:00 PM', fin: '08:00 PM' },
+];
 
 interface ConectadoDetalleModalProps {
   eventoId: string;
@@ -61,6 +72,12 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
     registrarAsistencia,
     temporadaActiva,
     factorBase,
+    turnos,
+    crearTurno,
+    actualizarTurno,
+    activarTurno,
+    cerrarTurno,
+    eliminarTurno,
   } = useApp();
 
   const evento = eventos.find((e) => e.id === eventoId);
@@ -83,6 +100,19 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
   );
   const [editUsaQr, setEditUsaQr] = useState(evento?.utilizaQr ?? true);
   const [editUsaTurnos, setEditUsaTurnos] = useState(evento?.utilizaTurnos ?? false);
+
+  // Turnos editing state inside Modal
+  const [editingTurnoModalId, setEditingTurnoModalId] = useState<string | null>(null);
+  const [editTurnoModalNombre, setEditTurnoModalNombre] = useState('');
+  const [editTurnoModalHoraInicio, setEditTurnoModalHoraInicio] = useState('');
+  const [editTurnoModalHoraFin, setEditTurnoModalHoraFin] = useState('');
+
+  // Add Turno state inside Modal
+  const [showAddTurnoModalLocal, setShowAddTurnoModalLocal] = useState(false);
+  const [newTurnoModalNombre, setNewTurnoModalNombre] = useState('');
+  const [newTurnoModalHoraInicio, setNewTurnoModalHoraInicio] = useState('08:00 AM');
+  const [newTurnoModalHoraFin, setNewTurnoModalHoraFin] = useState('10:00 AM');
+  const [turnoSuccessMsg, setTurnoSuccessMsg] = useState<string | null>(null);
 
   // New Reto Form State
   const [showAddReto, setShowAddReto] = useState(false);
@@ -238,6 +268,11 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
   const asistenciasConectado = useMemo(() => {
     return asistencias.filter((a) => a.eventoId === eventoId && !a.anulado);
   }, [asistencias, eventoId]);
+
+  // Shifts belonging to this Conectado
+  const eventoTurnos = useMemo(() => {
+    return turnos.filter((t) => t.eventoId === eventoId);
+  }, [turnos, eventoId]);
 
   if (!evento) return null;
 
@@ -1088,7 +1123,8 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
           {/* TAB 3: MODIFICAR CONECTADO (EDICIÓN COMPLETA)                             */}
           {/* ========================================================================= */}
           {activeTab === 'editar' && (
-            <form onSubmit={handleSaveEdit} className="space-y-5 max-w-2xl">
+            <div className="space-y-6 max-w-4xl">
+              <form onSubmit={handleSaveEdit} className="space-y-5">
               <div>
                 <h3 className="text-base font-black text-white">
                   Editar Parámetros de {evento.nombre}
@@ -1200,7 +1236,7 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
                 />
               </div>
 
-              <div className="flex flex-wrap gap-4 pt-2">
+              <div className="space-y-2 pt-2">
                 <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
                   <input
                     type="checkbox"
@@ -1209,6 +1245,16 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
                     className="rounded bg-slate-800 border-slate-700 text-amber-500 focus:ring-amber-500"
                   />
                   <span>Permitir escaneo de QR para registrar asistencia</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer text-xs text-amber-300 font-bold">
+                  <input
+                    type="checkbox"
+                    checked={editUsaTurnos}
+                    onChange={(e) => setEditUsaTurnos(e.target.checked)}
+                    className="rounded bg-slate-800 border-slate-700 text-amber-500 focus:ring-amber-500"
+                  />
+                  <span>Manejar múltiples turnos con horarios independientes y QRs separados</span>
                 </label>
               </div>
 
@@ -1230,6 +1276,286 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
                 </button>
               </div>
             </form>
+
+            {/* Shifts (Turnos) within this Event */}
+            {(evento.utilizaTurnos || editUsaTurnos) && (
+              <div className="mt-8 pt-6 border-t border-slate-800 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-sm font-black text-amber-400 flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      Turnos y Horarios de {evento.nombre} ({eventoTurnos.length})
+                    </h4>
+                    <p className="text-xs text-slate-400">
+                      Modifica las horas de inicio y fin de cada turno o agrega turnos adicionales.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const turnoNum = eventoTurnos.length + 1;
+                      let defaultInicio = '08:00 AM';
+                      let defaultFin = '10:00 AM';
+                      if (eventoTurnos.length > 0) {
+                        const lastTurno = eventoTurnos[eventoTurnos.length - 1];
+                        if (lastTurno.horaFin) {
+                          defaultInicio = lastTurno.horaFin;
+                          const match = PRESET_HORARIOS.find((p) => p.inicio === lastTurno.horaFin);
+                          defaultFin = match ? match.fin : '12:00 PM';
+                        }
+                      }
+                      setNewTurnoModalNombre(`Turno ${turnoNum}`);
+                      setNewTurnoModalHoraInicio(defaultInicio);
+                      setNewTurnoModalHoraFin(defaultFin);
+                      setShowAddTurnoModalLocal(true);
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:text-amber-200 text-xs font-bold flex items-center gap-1.5 shadow transition-all cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Agregar Turno
+                  </button>
+                </div>
+
+                {turnoSuccessMsg && (
+                  <div className="p-3 bg-emerald-950/70 border border-emerald-500/50 text-emerald-300 text-xs rounded-xl flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>{turnoSuccessMsg}</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {eventoTurnos.map((t) => {
+                    const isEditing = editingTurnoModalId === t.id;
+
+                    if (isEditing) {
+                      return (
+                        <div
+                          key={t.id}
+                          className="p-4 rounded-2xl border-2 border-amber-500/80 bg-slate-900 shadow-xl space-y-3 text-xs"
+                        >
+                          <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
+                            <span className="font-extrabold text-amber-300 flex items-center gap-1.5">
+                              <Pencil className="w-3.5 h-3.5" /> Modificar Horario
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setEditingTurnoModalId(null)}
+                              className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                              Nombre del Turno:
+                            </label>
+                            <input
+                              type="text"
+                              value={editTurnoModalNombre}
+                              onChange={(ev) => setEditTurnoModalNombre(ev.target.value)}
+                              className="w-full bg-slate-800 text-white font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 text-xs focus:ring-2 focus:ring-amber-500"
+                              placeholder="Ej: Turno 1"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                                Hora Inicio:
+                              </label>
+                              <input
+                                type="text"
+                                value={editTurnoModalHoraInicio}
+                                onChange={(ev) => setEditTurnoModalHoraInicio(ev.target.value)}
+                                className="w-full bg-slate-800 text-amber-300 font-extrabold px-2 py-1.5 rounded-lg border border-slate-700 text-xs text-center focus:ring-2 focus:ring-amber-500"
+                                placeholder="08:00 AM"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                                Hora Fin:
+                              </label>
+                              <input
+                                type="text"
+                                value={editTurnoModalHoraFin}
+                                onChange={(ev) => setEditTurnoModalHoraFin(ev.target.value)}
+                                className="w-full bg-slate-800 text-amber-300 font-extrabold px-2 py-1.5 rounded-lg border border-slate-700 text-xs text-center focus:ring-2 focus:ring-amber-500"
+                                placeholder="10:00 AM"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-semibold block mb-1">
+                              Horarios sugeridos (1 clic):
+                            </span>
+                            <div className="flex flex-wrap gap-1">
+                              {PRESET_HORARIOS.map((p) => (
+                                <button
+                                  key={p.label}
+                                  type="button"
+                                  onClick={() => {
+                                    setEditTurnoModalHoraInicio(p.inicio);
+                                    setEditTurnoModalHoraFin(p.fin);
+                                  }}
+                                  className={`text-[9px] px-1.5 py-0.5 rounded font-bold transition-colors cursor-pointer ${
+                                    editTurnoModalHoraInicio === p.inicio && editTurnoModalHoraFin === p.fin
+                                      ? 'bg-amber-500 text-slate-950 font-black shadow'
+                                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700/60'
+                                  }`}
+                                >
+                                  {p.inicio.replace(':00', '')} - {p.fin.replace(':00', '')}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm(`¿Eliminar el "${t.nombre}"?`)) {
+                                  eliminarTurno(t.id);
+                                  setEditingTurnoModalId(null);
+                                  setTurnoSuccessMsg(`Turno "${t.nombre}" eliminado.`);
+                                  setTimeout(() => setTurnoSuccessMsg(null), 3000);
+                                }
+                              }}
+                              className="p-1.5 rounded-lg bg-red-950/50 hover:bg-red-900/80 text-red-400 border border-red-800/80 text-xs cursor-pointer"
+                              title="Eliminar este turno"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setEditingTurnoModalId(null)}
+                                className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs cursor-pointer"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nuevoNombre = editTurnoModalNombre.trim() || t.nombre;
+                                  const nuevaInicio = editTurnoModalHoraInicio.trim() || t.horaInicio;
+                                  const nuevaFin = editTurnoModalHoraFin.trim() || t.horaFin;
+                                  actualizarTurno(t.id, {
+                                    nombre: nuevoNombre,
+                                    horaInicio: nuevaInicio,
+                                    horaFin: nuevaFin,
+                                  });
+                                  setEditingTurnoModalId(null);
+                                  setTurnoSuccessMsg(`¡Horario actualizado! ${nuevoNombre}: ${nuevaInicio} - ${nuevaFin}`);
+                                  setTimeout(() => setTurnoSuccessMsg(null), 4000);
+                                }}
+                                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1 shadow cursor-pointer"
+                              >
+                                <Check className="w-3 h-3" /> Guardar
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={t.id}
+                        className={`p-3.5 rounded-2xl border text-xs flex flex-col justify-between transition-all ${
+                          t.activo
+                            ? 'bg-emerald-950/30 border-emerald-500/50 shadow-lg shadow-emerald-950/20'
+                            : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="font-bold text-white text-sm">{t.nombre}</span>
+                            <span
+                              className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${
+                                t.activo
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                  : 'bg-slate-800 text-slate-400 border border-slate-700'
+                              }`}
+                            >
+                              {t.activo ? 'QR Activo' : 'Cerrado'}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-amber-300 font-extrabold bg-slate-950/80 px-3 py-2 rounded-xl border border-slate-800 mb-3">
+                            <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+                            <span className="tracking-wide text-xs">
+                              {t.horaInicio} - {t.horaFin}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingTurnoModalId(t.id);
+                              setEditTurnoModalNombre(t.nombre);
+                              setEditTurnoModalHoraInicio(t.horaInicio);
+                              setEditTurnoModalHoraFin(t.horaFin);
+                            }}
+                            className="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:text-amber-200 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                            title="Modificar nombre y horario"
+                          >
+                            <Pencil className="w-3 h-3" /> Editar
+                          </button>
+
+                          <div className="flex items-center gap-1.5">
+                            {t.activo ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  cerrarTurno(t.id);
+                                  setTurnoSuccessMsg(`QR de ${t.nombre} cerrado.`);
+                                  setTimeout(() => setTurnoSuccessMsg(null), 3000);
+                                }}
+                                className="px-2 py-1 bg-red-600/80 hover:bg-red-600 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                              >
+                                <Lock className="w-3 h-3" /> Cerrar QR
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  activarTurno(t.id);
+                                  setTurnoSuccessMsg(`QR de ${t.nombre} activado.`);
+                                  setTimeout(() => setTurnoSuccessMsg(null), 3000);
+                                }}
+                                className="px-2 py-1 bg-emerald-600/80 hover:bg-emerald-600 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                              >
+                                <Unlock className="w-3 h-3" /> Abrir QR
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm(`¿Eliminar el turno "${t.nombre}"?`)) {
+                                  eliminarTurno(t.id);
+                                  setTurnoSuccessMsg(`Turno "${t.nombre}" eliminado.`);
+                                  setTimeout(() => setTurnoSuccessMsg(null), 3000);
+                                }
+                              }}
+                              className="p-1 rounded-lg bg-slate-800 hover:bg-red-950/60 text-slate-400 hover:text-red-400 border border-slate-700/60 cursor-pointer"
+                              title="Eliminar turno"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            </div>
           )}
 
           {/* ========================================================================= */}
@@ -1635,6 +1961,133 @@ export const ConectadoDetalleModal: React.FC<ConectadoDetalleModalProps> = ({
             </div>
           )}
         </div>
+
+        {/* ========================================================================= */}
+        {/* MODAL LOCAL: AGREGAR NUEVO TURNO DENTRO DE CONECTADO                      */}
+        {/* ========================================================================= */}
+        {showAddTurnoModalLocal && (
+          <div className="fixed inset-0 z-60 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-white">
+                      Nuevo Turno para {evento.nombre}
+                    </h3>
+                    <p className="text-xs text-slate-400">Configura el nombre y horario del turno</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddTurnoModalLocal(false)}
+                  className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3.5 text-xs">
+                <div>
+                  <label className="block font-bold text-slate-300 mb-1">
+                    Nombre del Turno:
+                  </label>
+                  <input
+                    type="text"
+                    value={newTurnoModalNombre}
+                    onChange={(e) => setNewTurnoModalNombre(e.target.value)}
+                    className="w-full bg-slate-800 text-white font-bold p-2.5 rounded-xl border border-slate-700 text-xs focus:ring-2 focus:ring-amber-500"
+                    placeholder="Ej: Turno 2"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-300 mb-1">
+                      Hora Inicio:
+                    </label>
+                    <input
+                      type="text"
+                      value={newTurnoModalHoraInicio}
+                      onChange={(e) => setNewTurnoModalHoraInicio(e.target.value)}
+                      className="w-full bg-slate-800 text-amber-300 font-extrabold p-2.5 rounded-xl border border-slate-700 text-xs text-center focus:ring-2 focus:ring-amber-500"
+                      placeholder="08:00 AM"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-300 mb-1">
+                      Hora Fin:
+                    </label>
+                    <input
+                      type="text"
+                      value={newTurnoModalHoraFin}
+                      onChange={(e) => setNewTurnoModalHoraFin(e.target.value)}
+                      className="w-full bg-slate-800 text-amber-300 font-extrabold p-2.5 rounded-xl border border-slate-700 text-xs text-center focus:ring-2 focus:ring-amber-500"
+                      placeholder="10:00 AM"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[11px] font-bold text-slate-400 block mb-1.5">
+                    Horarios sugeridos (1 clic):
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {PRESET_HORARIOS.map((p) => (
+                      <button
+                        key={p.label}
+                        type="button"
+                        onClick={() => {
+                          setNewTurnoModalHoraInicio(p.inicio);
+                          setNewTurnoModalHoraFin(p.fin);
+                        }}
+                        className={`p-2 rounded-xl text-[10px] font-bold border transition-colors cursor-pointer text-left ${
+                          newTurnoModalHoraInicio === p.inicio && newTurnoModalHoraFin === p.fin
+                            ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border-slate-700/80'
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-800 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddTurnoModalLocal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    crearTurno({
+                      eventoId: evento.id,
+                      temporadaId: evento.temporadaId || temporadaActiva?.id || '',
+                      nombre: newTurnoModalNombre.trim() || 'Turno',
+                      horaInicio: newTurnoModalHoraInicio.trim() || '08:00 AM',
+                      horaFin: newTurnoModalHoraFin.trim() || '10:00 AM',
+                      estado: 'programado',
+                      activo: false,
+                    });
+                    setShowAddTurnoModalLocal(false);
+                    setTurnoSuccessMsg(`Turno "${newTurnoModalNombre}" creado con horario ${newTurnoModalHoraInicio} - ${newTurnoModalHoraFin}`);
+                    setTimeout(() => setTurnoSuccessMsg(null), 4000);
+                  }}
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 cursor-pointer"
+                >
+                  Crear Turno
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -90,6 +90,7 @@ function AppContent() {
             <Podium
               podio={podio}
               onSelectGt={(gtId) => setSelectedGtId(gtId)}
+              onSelectPersona={(personaId) => setSelectedPersonaId(personaId)}
             />
 
             {/* Showcase: Calificación y Retos por Conectado */}

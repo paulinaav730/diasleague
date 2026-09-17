@@ -19,6 +19,7 @@ import {
   RotateCcw,
   Trash2,
   Edit2,
+  Pencil,
   Plus,
   Check,
   X,
@@ -44,6 +45,15 @@ type AdminTab =
   | 'temporadas'
   | 'auditoria'
   | 'datos';
+
+const PRESET_HORARIOS = [
+  { label: '08:00 AM - 10:00 AM', inicio: '08:00 AM', fin: '10:00 AM' },
+  { label: '10:00 AM - 12:00 PM', inicio: '10:00 AM', fin: '12:00 PM' },
+  { label: '12:00 PM - 02:00 PM', inicio: '12:00 PM', fin: '02:00 PM' },
+  { label: '02:00 PM - 04:00 PM', inicio: '02:00 PM', fin: '04:00 PM' },
+  { label: '04:00 PM - 06:00 PM', inicio: '04:00 PM', fin: '06:00 PM' },
+  { label: '06:00 PM - 08:00 PM', inicio: '06:00 PM', fin: '08:00 PM' },
+];
 
 export const AdminPanel: React.FC = () => {
   const {
@@ -81,6 +91,7 @@ export const AdminPanel: React.FC = () => {
     actualizarTurno,
     activarTurno,
     cerrarTurno,
+    eliminarTurno,
     crearReto,
     actualizarReto,
     eliminarReto,
@@ -130,6 +141,18 @@ export const AdminPanel: React.FC = () => {
   // Participation points editing state
   const [editingPrId, setEditingPrId] = useState<string | null>(null);
   const [editPrPuntos, setEditPrPuntos] = useState<number>(25);
+
+  // Turno (shift) editing and creation state
+  const [editingTurnoId, setEditingTurnoId] = useState<string | null>(null);
+  const [editTurnoNombre, setEditTurnoNombre] = useState('');
+  const [editTurnoHoraInicio, setEditTurnoHoraInicio] = useState('');
+  const [editTurnoHoraFin, setEditTurnoHoraFin] = useState('');
+
+  const [showAddTurnoModal, setShowAddTurnoModal] = useState(false);
+  const [addTurnoEventoId, setAddTurnoEventoId] = useState<string | null>(null);
+  const [newTurnoNombre, setNewTurnoNombre] = useState('');
+  const [newTurnoHoraInicio, setNewTurnoHoraInicio] = useState('08:00 AM');
+  const [newTurnoHoraFin, setNewTurnoHoraFin] = useState('10:00 AM');
 
   // Season creation state
   const [newTempName, setNewTempName] = useState('');
@@ -497,6 +520,27 @@ export const AdminPanel: React.FC = () => {
                         </select>
 
                         <button
+                          type="button"
+                          onClick={() => {
+                            actualizarEvento(e.id, { utilizaTurnos: !e.utilizaTurnos });
+                            showFeedback(
+                              e.utilizaTurnos
+                                ? `Turnos deshabilitados para ${e.nombre}`
+                                : `Turnos habilitados para ${e.nombre}. Ahora puedes configurar sus horarios.`
+                            );
+                          }}
+                          className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer flex items-center gap-1.5 ${
+                            e.utilizaTurnos
+                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
+                              : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                          }`}
+                          title="Habilitar o deshabilitar múltiples turnos horarios para este evento"
+                        >
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>{e.utilizaTurnos ? 'Con Turnos' : '+ Turnos'}</span>
+                        </button>
+
+                        <button
                           onClick={() => setSelectedConectadoModalId(e.id)}
                           className="px-3 py-1.5 rounded-xl bg-purple-600/80 hover:bg-purple-600 text-white font-bold text-xs flex items-center gap-1 shadow cursor-pointer"
                           title="Gestionar retos internos y calificar Conectado"
@@ -526,83 +570,269 @@ export const AdminPanel: React.FC = () => {
 
                     {/* Shifts (Turnos) within this Event */}
                     {e.utilizaTurnos && (
-                      <div className="pl-4 border-l-2 border-slate-800 space-y-2 mt-2">
+                      <div className="pl-4 border-l-2 border-amber-500/30 space-y-3 mt-3">
                         <div className="flex items-center justify-between">
                           <span className="text-xs uppercase font-bold text-amber-400 flex items-center gap-1.5">
                             <Clock className="w-3.5 h-3.5" />
-                            Turnos de {e.nombre} ({eventoTurnos.length})
+                            Turnos y Horarios de {e.nombre} ({eventoTurnos.length})
                           </span>
                           <button
+                            type="button"
                             onClick={() => {
                               const turnoNum = eventoTurnos.length + 1;
-                              crearTurno({
-                                eventoId: e.id,
-                                temporadaId: e.temporadaId,
-                                nombre: `Turno ${turnoNum}`,
-                                horaInicio: '08:00 AM',
-                                horaFin: '10:00 AM',
-                                estado: 'programado',
-                                activo: false,
-                              });
-                              showFeedback(`Turno ${turnoNum} creado para ${e.nombre}`);
+                              let defaultInicio = '08:00 AM';
+                              let defaultFin = '10:00 AM';
+                              if (eventoTurnos.length > 0) {
+                                const lastTurno = eventoTurnos[eventoTurnos.length - 1];
+                                if (lastTurno.horaFin) {
+                                  defaultInicio = lastTurno.horaFin;
+                                  const match = PRESET_HORARIOS.find((p) => p.inicio === lastTurno.horaFin);
+                                  defaultFin = match ? match.fin : '12:00 PM';
+                                }
+                              }
+                              setAddTurnoEventoId(e.id);
+                              setNewTurnoNombre(`Turno ${turnoNum}`);
+                              setNewTurnoHoraInicio(defaultInicio);
+                              setNewTurnoHoraFin(defaultFin);
+                              setShowAddTurnoModal(true);
                             }}
-                            className="text-[11px] text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1"
+                            className="text-xs text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow"
                           >
-                            <Plus className="w-3 h-3" /> Agregar Turno
+                            <Plus className="w-3.5 h-3.5" /> Agregar Turno
                           </button>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                          {eventoTurnos.map((t) => (
-                            <div
-                              key={t.id}
-                              className={`p-3 rounded-xl border text-xs flex flex-col justify-between ${
-                                t.activo
-                                  ? 'bg-emerald-950/20 border-emerald-500/40'
-                                  : 'bg-slate-800/40 border-slate-800'
-                              }`}
-                            >
-                              <div className="flex justify-between items-start mb-2">
-                                <span className="font-bold text-white">{t.nombre}</span>
-                                <span
-                                  className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                                    t.activo
-                                      ? 'bg-emerald-500/20 text-emerald-300'
-                                      : 'bg-slate-800 text-slate-500'
-                                  }`}
-                                >
-                                  {t.activo ? 'QR Activo' : 'Cerrado'}
-                                </span>
-                              </div>
-                              <span className="text-[11px] text-slate-400 mb-2">
-                                {t.horaInicio} - {t.horaFin}
-                              </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                          {eventoTurnos.map((t) => {
+                            const isEditing = editingTurnoId === t.id;
 
-                              <div className="pt-2 border-t border-slate-800/80 flex justify-between items-center">
-                                {t.activo ? (
+                            if (isEditing) {
+                              return (
+                                <div
+                                  key={t.id}
+                                  className="p-3.5 rounded-2xl border-2 border-amber-500/80 bg-slate-900 shadow-xl space-y-3 text-xs"
+                                >
+                                  <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
+                                    <span className="font-extrabold text-amber-300 flex items-center gap-1.5">
+                                      <Pencil className="w-3.5 h-3.5" /> Modificar Horario
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingTurnoId(null)}
+                                      className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+
+                                  {/* Nombre input */}
+                                  <div>
+                                    <label className="block text-[11px] font-bold text-slate-300 mb-1">
+                                      Nombre del Turno:
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={editTurnoNombre}
+                                      onChange={(ev) => setEditTurnoNombre(ev.target.value)}
+                                      className="w-full bg-slate-800 text-white font-bold px-2.5 py-1.5 rounded-lg border border-slate-700 text-xs focus:ring-2 focus:ring-amber-500"
+                                      placeholder="Ej: Turno 1"
+                                    />
+                                  </div>
+
+                                  {/* Horas Inicio y Fin */}
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                                        Hora Inicio:
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={editTurnoHoraInicio}
+                                        onChange={(ev) => setEditTurnoHoraInicio(ev.target.value)}
+                                        className="w-full bg-slate-800 text-amber-300 font-extrabold px-2 py-1.5 rounded-lg border border-slate-700 text-xs text-center focus:ring-2 focus:ring-amber-500"
+                                        placeholder="08:00 AM"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                                        Hora Fin:
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={editTurnoHoraFin}
+                                        onChange={(ev) => setEditTurnoHoraFin(ev.target.value)}
+                                        className="w-full bg-slate-800 text-amber-300 font-extrabold px-2 py-1.5 rounded-lg border border-slate-700 text-xs text-center focus:ring-2 focus:ring-amber-500"
+                                        placeholder="10:00 AM"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Quick Presets */}
+                                  <div>
+                                    <span className="text-[10px] text-slate-400 font-semibold block mb-1">
+                                      Horarios sugeridos (1 clic):
+                                    </span>
+                                    <div className="flex flex-wrap gap-1">
+                                      {PRESET_HORARIOS.map((p) => (
+                                        <button
+                                          key={p.label}
+                                          type="button"
+                                          onClick={() => {
+                                            setEditTurnoHoraInicio(p.inicio);
+                                            setEditTurnoHoraFin(p.fin);
+                                          }}
+                                          className={`text-[9px] px-1.5 py-0.5 rounded font-bold transition-colors cursor-pointer ${
+                                            editTurnoHoraInicio === p.inicio && editTurnoHoraFin === p.fin
+                                              ? 'bg-amber-500 text-slate-950 font-black shadow'
+                                              : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700/60'
+                                          }`}
+                                        >
+                                          {p.inicio.replace(':00', '')} - {p.fin.replace(':00', '')}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  {/* Save & Cancel */}
+                                  <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (window.confirm(`¿Eliminar el "${t.nombre}"?`)) {
+                                          eliminarTurno(t.id);
+                                          setEditingTurnoId(null);
+                                          showFeedback(`Turno "${t.nombre}" eliminado.`);
+                                        }
+                                      }}
+                                      className="p-1.5 rounded-lg bg-red-950/50 hover:bg-red-900/80 text-red-400 border border-red-800/80 text-xs cursor-pointer"
+                                      title="Eliminar este turno"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+
+                                    <div className="flex items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingTurnoId(null)}
+                                        className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs cursor-pointer"
+                                      >
+                                        Cancelar
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const nuevoNombre = editTurnoNombre.trim() || t.nombre;
+                                          const nuevaInicio = editTurnoHoraInicio.trim() || t.horaInicio;
+                                          const nuevaFin = editTurnoHoraFin.trim() || t.horaFin;
+                                          actualizarTurno(t.id, {
+                                            nombre: nuevoNombre,
+                                            horaInicio: nuevaInicio,
+                                            horaFin: nuevaFin,
+                                          });
+                                          setEditingTurnoId(null);
+                                          showFeedback(`¡Horario actualizado! ${nuevoNombre}: ${nuevaInicio} - ${nuevaFin}`);
+                                        }}
+                                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1 shadow cursor-pointer"
+                                      >
+                                        <Check className="w-3 h-3" /> Guardar
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div
+                                key={t.id}
+                                className={`p-3.5 rounded-2xl border text-xs flex flex-col justify-between transition-all ${
+                                  t.activo
+                                    ? 'bg-emerald-950/30 border-emerald-500/50 shadow-lg shadow-emerald-950/20'
+                                    : 'bg-slate-850/90 border-slate-800 hover:border-slate-700'
+                                }`}
+                              >
+                                <div>
+                                  <div className="flex justify-between items-start mb-2">
+                                    <span className="font-bold text-white text-sm">{t.nombre}</span>
+                                    <span
+                                      className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${
+                                        t.activo
+                                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                          : 'bg-slate-800 text-slate-400 border border-slate-700'
+                                      }`}
+                                    >
+                                      {t.activo ? 'QR Activo' : 'Cerrado'}
+                                    </span>
+                                  </div>
+
+                                  {/* Prominent Hours Display */}
+                                  <div className="flex items-center gap-2 text-amber-300 font-extrabold bg-slate-900/90 px-3 py-2 rounded-xl border border-slate-800 mb-3">
+                                    <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+                                    <span className="tracking-wide text-xs">
+                                      {t.horaInicio} - {t.horaFin}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Actions Toolbar */}
+                                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-1.5">
                                   <button
+                                    type="button"
                                     onClick={() => {
-                                      cerrarTurno(t.id);
-                                      showFeedback(`QR de ${t.nombre} cerrado.`);
+                                      setEditingTurnoId(t.id);
+                                      setEditTurnoNombre(t.nombre);
+                                      setEditTurnoHoraInicio(t.horaInicio);
+                                      setEditTurnoHoraFin(t.horaFin);
                                     }}
-                                    className="px-2 py-1 bg-red-600/80 hover:bg-red-600 text-white rounded text-[10px] font-bold flex items-center gap-1"
+                                    className="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:text-amber-200 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                    title="Modificar nombre y horarios de este turno"
                                   >
-                                    <Lock className="w-3 h-3" /> Cerrar QR
+                                    <Pencil className="w-3 h-3" /> Editar
                                   </button>
-                                ) : (
-                                  <button
-                                    onClick={() => {
-                                      activarTurno(t.id);
-                                      showFeedback(`QR de ${t.nombre} activado.`);
-                                    }}
-                                    className="px-2 py-1 bg-emerald-600/80 hover:bg-emerald-600 text-white rounded text-[10px] font-bold flex items-center gap-1"
-                                  >
-                                    <Unlock className="w-3 h-3" /> Abrir QR
-                                  </button>
-                                )}
+
+                                  <div className="flex items-center gap-1.5">
+                                    {t.activo ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          cerrarTurno(t.id);
+                                          showFeedback(`QR de ${t.nombre} cerrado.`);
+                                        }}
+                                        className="px-2 py-1 bg-red-600/80 hover:bg-red-600 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                                      >
+                                        <Lock className="w-3 h-3" /> Cerrar QR
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          activarTurno(t.id);
+                                          showFeedback(`QR de ${t.nombre} activado.`);
+                                        }}
+                                        className="px-2 py-1 bg-emerald-600/80 hover:bg-emerald-600 text-white rounded-lg text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                                      >
+                                        <Unlock className="w-3 h-3" /> Abrir QR
+                                      </button>
+                                    )}
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (window.confirm(`¿Eliminar el turno "${t.nombre}"?`)) {
+                                          eliminarTurno(t.id);
+                                          showFeedback(`Turno "${t.nombre}" eliminado.`);
+                                        }
+                                      }}
+                                      className="p-1 rounded-lg bg-slate-800 hover:bg-red-950/60 text-slate-400 hover:text-red-400 border border-slate-700/60 cursor-pointer"
+                                      title="Eliminar turno"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -2204,6 +2434,133 @@ export const AdminPanel: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: AGREGAR NUEVO TURNO A UN EVENTO CON HORARIO DEFINIDO              */}
+      {/* ========================================================================= */}
+      {showAddTurnoModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">
+                    Nuevo Turno de Asistencia
+                  </h3>
+                  <p className="text-xs text-slate-400">Configura el nombre y horario del turno</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddTurnoModal(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5 text-xs">
+              <div>
+                <label className="block font-bold text-slate-300 mb-1">
+                  Nombre del Turno:
+                </label>
+                <input
+                  type="text"
+                  value={newTurnoNombre}
+                  onChange={(e) => setNewTurnoNombre(e.target.value)}
+                  className="w-full bg-slate-800 text-white font-bold p-2.5 rounded-xl border border-slate-700 text-xs focus:ring-2 focus:ring-amber-500"
+                  placeholder="Ej: Turno 2"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-300 mb-1">
+                    Hora Inicio:
+                  </label>
+                  <input
+                    type="text"
+                    value={newTurnoHoraInicio}
+                    onChange={(e) => setNewTurnoHoraInicio(e.target.value)}
+                    className="w-full bg-slate-800 text-amber-300 font-extrabold p-2.5 rounded-xl border border-slate-700 text-xs text-center focus:ring-2 focus:ring-amber-500"
+                    placeholder="08:00 AM"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-300 mb-1">
+                    Hora Fin:
+                  </label>
+                  <input
+                    type="text"
+                    value={newTurnoHoraFin}
+                    onChange={(e) => setNewTurnoHoraFin(e.target.value)}
+                    className="w-full bg-slate-800 text-amber-300 font-extrabold p-2.5 rounded-xl border border-slate-700 text-xs text-center focus:ring-2 focus:ring-amber-500"
+                    placeholder="10:00 AM"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <span className="text-[11px] font-bold text-slate-400 block mb-1.5">
+                  Horarios sugeridos (1 clic):
+                </span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {PRESET_HORARIOS.map((p) => (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => {
+                        setNewTurnoHoraInicio(p.inicio);
+                        setNewTurnoHoraFin(p.fin);
+                      }}
+                      className={`p-2 rounded-xl text-[10px] font-bold border transition-colors cursor-pointer text-left ${
+                        newTurnoHoraInicio === p.inicio && newTurnoHoraFin === p.fin
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 font-black shadow'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border-slate-700/80'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-800 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowAddTurnoModal(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!addTurnoEventoId || !temporadaActiva) return;
+                  crearTurno({
+                    eventoId: addTurnoEventoId,
+                    temporadaId: temporadaActiva.id,
+                    nombre: newTurnoNombre.trim() || 'Turno',
+                    horaInicio: newTurnoHoraInicio.trim() || '08:00 AM',
+                    horaFin: newTurnoHoraFin.trim() || '10:00 AM',
+                    estado: 'programado',
+                    activo: false,
+                  });
+                  setShowAddTurnoModal(false);
+                  showFeedback(`Turno "${newTurnoNombre}" creado con horario ${newTurnoHoraInicio} - ${newTurnoHoraFin}`);
+                }}
+                className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 cursor-pointer"
+              >
+                Crear Turno
+              </button>
+            </div>
           </div>
         </div>
       )}
