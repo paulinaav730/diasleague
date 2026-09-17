@@ -17,6 +17,7 @@ import {
   Search,
   UserPlus,
   Plus,
+  Clock,
 } from 'lucide-react';
 import { calcularFactorTamano } from '../../lib/calculator';
 
@@ -26,6 +27,7 @@ export const GtAttendanceSizeSection: React.FC = () => {
     gts,
     personas,
     asistencias,
+    turnos,
     temporadaActiva,
     factorBase,
     setFactorBase,
@@ -45,6 +47,23 @@ export const GtAttendanceSizeSection: React.FC = () => {
   });
 
   const selectedEvento = eventos.find((e) => e.id === selectedEventoId);
+
+  // Available turnos if event uses shifts (e.g. EXPECTA DIAS)
+  const availableTurnos = useMemo(() => {
+    return turnos.filter((t) => t.eventoId === selectedEventoId);
+  }, [turnos, selectedEventoId]);
+
+  const [selectedTurnoId, setSelectedTurnoId] = useState<string>('todos');
+
+  // Sync selectedTurnoId when event or turnos change
+  React.useEffect(() => {
+    if (availableTurnos.length > 0) {
+      const active = availableTurnos.find((t) => t.activo);
+      setSelectedTurnoId(active?.id || 'todos');
+    } else {
+      setSelectedTurnoId('todos');
+    }
+  }, [selectedEventoId, availableTurnos]);
 
   // Editable base points
   const [basePointsInput, setBasePointsInput] = useState<number>(
@@ -137,7 +156,8 @@ export const GtAttendanceSizeSection: React.FC = () => {
       (a) =>
         a.eventoId === selectedEvento.id &&
         a.personaId === personaId &&
-        !a.anulado
+        !a.anulado &&
+        (selectedEvento.utilizaTurnos && selectedTurnoId !== 'todos' ? a.turnoId === selectedTurnoId : true)
     );
 
     if (existing) {
@@ -146,11 +166,17 @@ export const GtAttendanceSizeSection: React.FC = () => {
     } else {
       const persona = personas.find((p) => p.id === personaId);
       if (persona) {
+        const targetTurnoId =
+          selectedEvento.utilizaTurnos && selectedTurnoId !== 'todos'
+            ? selectedTurnoId
+            : availableTurnos[0]?.id || null;
+
         const res = registrarAsistencia({
           eventoId: selectedEvento.id,
           personaId: persona.id,
           nombreCompleto: persona.nombreCompleto,
           gtId: persona.gtId,
+          turnoId: targetTurnoId,
           origen: 'manual',
         });
         if (res.success) {
@@ -235,10 +261,16 @@ export const GtAttendanceSizeSection: React.FC = () => {
     }
 
     const targetGtId = quickAddGtId || gts[0]?.id;
+    const targetTurnoId =
+      selectedEvento.utilizaTurnos && selectedTurnoId !== 'todos'
+        ? selectedTurnoId
+        : availableTurnos[0]?.id || null;
+
     const res = registrarAsistencia({
       eventoId: selectedEvento.id,
       nombreCompleto: quickAddName.trim(),
       gtId: targetGtId,
+      turnoId: targetTurnoId,
       origen: 'manual',
     });
 
@@ -259,10 +291,16 @@ export const GtAttendanceSizeSection: React.FC = () => {
     const name = (inlineNewMember[gtId] || '').trim();
     if (!name) return;
 
+    const targetTurnoId =
+      selectedEvento.utilizaTurnos && selectedTurnoId !== 'todos'
+        ? selectedTurnoId
+        : availableTurnos[0]?.id || null;
+
     const res = registrarAsistencia({
       eventoId: selectedEvento.id,
       nombreCompleto: name,
       gtId: gtId,
+      turnoId: targetTurnoId,
       origen: 'manual',
     });
 
@@ -300,7 +338,7 @@ export const GtAttendanceSizeSection: React.FC = () => {
             </p>
           </div>
 
-          {/* Event Picker & Factor Base Badge */}
+          {/* Event Picker & Turno Selector */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0 bg-slate-950/70 p-3 rounded-2xl border border-slate-800">
             <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
               <Calendar className="w-4 h-4 text-indigo-400" />
@@ -317,6 +355,26 @@ export const GtAttendanceSizeSection: React.FC = () => {
                 </option>
               ))}
             </select>
+
+            {/* Turno selector if event uses turnos (e.g. EXPECTA DIAS) */}
+            {selectedEvento?.utilizaTurnos && availableTurnos.length > 0 && (
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-300 pl-0 sm:pl-2 border-t sm:border-t-0 sm:border-l border-slate-800 pt-2 sm:pt-0">
+                <Clock className="w-4 h-4 text-amber-400" />
+                <span>Turno:</span>
+                <select
+                  value={selectedTurnoId}
+                  onChange={(e) => setSelectedTurnoId(e.target.value)}
+                  className="bg-slate-850 text-amber-300 font-bold text-xs px-3 py-2 rounded-xl border border-slate-700 focus:ring-2 focus:ring-amber-500 max-w-xs"
+                >
+                  <option value="todos">Todos los Turnos</option>
+                  {availableTurnos.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.nombre} ({t.horaInicio} - {t.horaFin})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
 

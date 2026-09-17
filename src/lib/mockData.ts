@@ -273,7 +273,7 @@ export const INITIAL_EVENTOS: Evento[] = [
     descripcion: 'Evento especial de expectativa por turnos independientes con registro por código QR.',
     fecha: '2026-09-21',
     temporadaId: 'temp-2026-2',
-    estado: 'programado', // PROGRAMADO
+    estado: 'activo', // ACTIVO para registro
     tipoEvento: 'turnos_qr',
     puntosAsistencia: 10,
     utilizaQr: true,
@@ -307,7 +307,7 @@ export const INITIAL_TURNOS: Turno[] = [
     horaFin: '12:00 PM',
     estado: 'programado',
     qrToken: 'qr-expecta-2026-09-21-t2',
-    activo: false,
+    activo: true,
     createdAt: '2026-09-01T08:00:00Z',
   },
   {
@@ -319,7 +319,7 @@ export const INITIAL_TURNOS: Turno[] = [
     horaFin: '03:00 PM',
     estado: 'programado',
     qrToken: 'qr-expecta-2026-09-21-t3',
-    activo: false,
+    activo: true,
     createdAt: '2026-09-01T08:00:00Z',
   },
   {
@@ -331,7 +331,7 @@ export const INITIAL_TURNOS: Turno[] = [
     horaFin: '05:00 PM',
     estado: 'programado',
     qrToken: 'qr-expecta-2026-09-21-t4',
-    activo: false,
+    activo: true,
     createdAt: '2026-09-01T08:00:00Z',
   },
 
@@ -345,7 +345,7 @@ export const INITIAL_TURNOS: Turno[] = [
     horaFin: '10:00 AM',
     estado: 'programado',
     qrToken: 'qr-expecta-2026-09-22-t1',
-    activo: false,
+    activo: true,
     createdAt: '2026-09-01T08:00:00Z',
   },
   {
@@ -357,7 +357,7 @@ export const INITIAL_TURNOS: Turno[] = [
     horaFin: '12:00 PM',
     estado: 'programado',
     qrToken: 'qr-expecta-2026-09-22-t2',
-    activo: false,
+    activo: true,
     createdAt: '2026-09-01T08:00:00Z',
   },
   {
@@ -369,7 +369,7 @@ export const INITIAL_TURNOS: Turno[] = [
     horaFin: '03:00 PM',
     estado: 'programado',
     qrToken: 'qr-expecta-2026-09-22-t3',
-    activo: false,
+    activo: true,
     createdAt: '2026-09-01T08:00:00Z',
   },
   {
@@ -381,7 +381,7 @@ export const INITIAL_TURNOS: Turno[] = [
     horaFin: '05:00 PM',
     estado: 'programado',
     qrToken: 'qr-expecta-2026-09-22-t4',
-    activo: false,
+    activo: true,
     createdAt: '2026-09-01T08:00:00Z',
   },
 
@@ -395,7 +395,7 @@ export const INITIAL_TURNOS: Turno[] = [
     horaFin: '10:00 AM',
     estado: 'programado',
     qrToken: 'qr-expecta-2026-09-23-t1',
-    activo: false,
+    activo: true,
     createdAt: '2026-09-01T08:00:00Z',
   },
   {
@@ -407,7 +407,7 @@ export const INITIAL_TURNOS: Turno[] = [
     horaFin: '12:00 PM',
     estado: 'programado',
     qrToken: 'qr-expecta-2026-09-23-t2',
-    activo: false,
+    activo: true,
     createdAt: '2026-09-01T08:00:00Z',
   },
   {
@@ -419,7 +419,7 @@ export const INITIAL_TURNOS: Turno[] = [
     horaFin: '03:00 PM',
     estado: 'programado',
     qrToken: 'qr-expecta-2026-09-23-t3',
-    activo: false,
+    activo: true,
     createdAt: '2026-09-01T08:00:00Z',
   },
   {
@@ -431,7 +431,7 @@ export const INITIAL_TURNOS: Turno[] = [
     horaFin: '05:00 PM',
     estado: 'programado',
     qrToken: 'qr-expecta-2026-09-23-t4',
-    activo: false,
+    activo: true,
     createdAt: '2026-09-01T08:00:00Z',
   },
 
@@ -445,7 +445,7 @@ export const INITIAL_TURNOS: Turno[] = [
     horaFin: '10:00 AM',
     estado: 'programado',
     qrToken: 'qr-expecta-2026-09-24-t1',
-    activo: false,
+    activo: true,
     createdAt: '2026-09-01T08:00:00Z',
   },
   {
@@ -457,7 +457,7 @@ export const INITIAL_TURNOS: Turno[] = [
     horaFin: '12:00 PM',
     estado: 'programado',
     qrToken: 'qr-expecta-2026-09-24-t2',
-    activo: false,
+    activo: true,
     createdAt: '2026-09-01T08:00:00Z',
   },
   {
@@ -469,7 +469,7 @@ export const INITIAL_TURNOS: Turno[] = [
     horaFin: '03:00 PM',
     estado: 'programado',
     qrToken: 'qr-expecta-2026-09-24-t3',
-    activo: false,
+    activo: true,
     createdAt: '2026-09-01T08:00:00Z',
   },
   {
@@ -481,7 +481,7 @@ export const INITIAL_TURNOS: Turno[] = [
     horaFin: '05:00 PM',
     estado: 'programado',
     qrToken: 'qr-expecta-2026-09-24-t4',
-    activo: false,
+    activo: true,
     createdAt: '2026-09-01T08:00:00Z',
   },
 
@@ -495,7 +495,7 @@ export const INITIAL_TURNOS: Turno[] = [
     horaFin: '10:00 AM',
     estado: 'programado',
     qrToken: 'qr-expecta-2026-09-25-t1',
-    activo: false,
+    activo: true,
     createdAt: '2026-09-01T08:00:00Z',
   },
   {
@@ -507,7 +507,7 @@ export const INITIAL_TURNOS: Turno[] = [
     horaFin: '12:00 PM',
     estado: 'programado',
     qrToken: 'qr-expecta-2026-09-25-t2',
-    activo: false,
+    activo: true,
     createdAt: '2026-09-01T08:00:00Z',
   },
   {
@@ -519,7 +519,7 @@ export const INITIAL_TURNOS: Turno[] = [
     horaFin: '03:00 PM',
     estado: 'programado',
     qrToken: 'qr-expecta-2026-09-25-t3',
-    activo: false,
+    activo: true,
     createdAt: '2026-09-01T08:00:00Z',
   },
   {
@@ -531,7 +531,7 @@ export const INITIAL_TURNOS: Turno[] = [
     horaFin: '05:00 PM',
     estado: 'programado',
     qrToken: 'qr-expecta-2026-09-25-t4',
-    activo: false,
+    activo: true,
     createdAt: '2026-09-01T08:00:00Z',
   },
 ];

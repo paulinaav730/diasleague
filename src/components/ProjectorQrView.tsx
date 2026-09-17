@@ -120,12 +120,9 @@ export const ProjectorQrView: React.FC<ProjectorQrViewProps> = ({
   const [copied, setCopied] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Generate registration URL strictly without 'undefined' literals
+  // Generate registration URL strictly pointing to the current app instance
   const registrationUrl = useMemo(() => {
-    if (typeof window === 'undefined') {
-      return 'https://diasleague.vercel.app/?tab=registro';
-    }
-    const origin = window.location.origin;
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
     if (!activeEvento) return `${origin}/?tab=registro`;
 
     if (hasTurnos && activeTurno) {

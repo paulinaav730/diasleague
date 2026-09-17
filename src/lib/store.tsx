@@ -131,6 +131,7 @@ interface AppContextType {
   crearTurno: (turno: Omit<Turno, 'id' | 'createdAt' | 'qrToken'>) => void;
   actualizarTurno: (id: string, updates: Partial<Turno>) => void;
   activarTurno: (id: string) => void;
+  activarTodosLosTurnos: (eventoId: string) => void;
   cerrarTurno: (id: string) => void;
   eliminarTurno: (id: string) => void;
 
@@ -271,12 +272,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [eventos, setEventos] = useState<Evento[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY + '_eventos');
-    return saved ? JSON.parse(saved) : INITIAL_EVENTOS;
+    if (!saved) return INITIAL_EVENTOS;
+    try {
+      const parsed: Evento[] = JSON.parse(saved);
+      // Ensure expecta-dias is active if it was stored as programado
+      return parsed.map((e) =>
+        e.id === 'eve-expecta-dias' && e.estado === 'programado'
+          ? { ...e, estado: 'activo' }
+          : e
+      );
+    } catch {
+      return INITIAL_EVENTOS;
+    }
   });
 
   const [turnos, setTurnos] = useState<Turno[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY + '_turnos');
-    return saved ? JSON.parse(saved) : INITIAL_TURNOS;
+    if (!saved) return INITIAL_TURNOS;
+    try {
+      const parsed: Turno[] = JSON.parse(saved);
+      // Ensure all turnos of expecta-dias have activo: true so they can receive attendances
+      const allActive = parsed.map((t) =>
+        t.eventoId === 'eve-expecta-dias' && !t.activo ? { ...t, activo: true } : t
+      );
+      return allActive;
+    } catch {
+      return INITIAL_TURNOS;
+    }
   });
 
   const [asistencias, setAsistencias] = useState<Asistencia[]>(() => {
@@ -580,10 +602,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (turnoId) {
         const turno = turnos.find((t) => t.id === turnoId);
         if (!turno) {
-          return { success: false, message: 'El turno no existe.' };
+          return { success: false, message: 'El turno seleccionado no existe.' };
         }
-        if (turno.estado === 'finalizado' || !turno.activo) {
-          return { success: false, message: 'Este turno ya finalizó o el QR ha sido cerrado por el administrador.' };
+        if (turno.estado === 'finalizado') {
+          return { success: false, message: 'Este turno ya finalizó.' };
         }
       }
 
@@ -637,7 +659,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (yaRegistrado) {
         return {
           success: false,
-          message: 'Ya registraste tu asistencia para este Conectado. No se permiten registros duplicados.',
+          message: turnoId
+            ? 'Esta persona ya tiene registrada su asistencia en este turno. Si asistió a un turno diferente, selecciona el otro turno.'
+            : 'Esta persona ya tiene registrada su asistencia para este Conectado.',
         };
       }
 
@@ -918,6 +942,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return t;
         })
       );
+    },
+    [addAuditLog]
+  );
+
+  const activarTodosLosTurnos = useCallback(
+    (eventoId: string) => {
+      setTurnos((prev) =>
+        prev.map((t) =>
+          t.eventoId === eventoId
+            ? { ...t, estado: 'activo', activo: true }
+            : t
+        )
+      );
+      addAuditLog('ACTIVAR_TODOS_TURNOS', 'evento', eventoId, `Se habilitaron todos los turnos del evento.`);
     },
     [addAuditLog]
   );
@@ -1495,6 +1533,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       crearTurno,
       actualizarTurno,
       activarTurno,
+      activarTodosLosTurnos,
       cerrarTurno,
       eliminarTurno,
       crearReto,
@@ -1561,6 +1600,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       crearTurno,
       actualizarTurno,
       activarTurno,
+      activarTodosLosTurnos,
       cerrarTurno,
       eliminarTurno,
       crearReto,
